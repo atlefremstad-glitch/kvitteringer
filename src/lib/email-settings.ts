@@ -9,12 +9,16 @@ export type EmailSettings = {
   gmail_refresh_token: string | null;
   forward_verification: string | null;
   forward_verification_at: string | null;
+  gmail_excludes: string[];
+  gmail_min_amount: number | null;
+  gmail_skipped: string[];
 };
 
 /** Henter brukerens e-postinnstillinger, og lager raden første gang. */
 export async function getEmailSettings(userId: string): Promise<EmailSettings> {
   const admin = createAdminClient();
-  const cols = "user_id, inbound_token, gmail_email, gmail_refresh_token, forward_verification, forward_verification_at";
+  const cols =
+    "user_id, inbound_token, gmail_email, gmail_refresh_token, forward_verification, forward_verification_at, gmail_excludes, gmail_min_amount, gmail_skipped";
   const { data } = await admin.from("email_settings").select(cols).eq("user_id", userId).maybeSingle();
   if (data) return data as EmailSettings;
 

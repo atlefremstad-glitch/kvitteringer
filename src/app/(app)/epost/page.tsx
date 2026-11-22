@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/supabase/server";
 import { forwardingAddress, getEmailSettings, gmailAccessToken, type EmailSettings } from "@/lib/email-settings";
-import { DEFAULT_QUERY, GmailAuthError, searchMessages, type GmailHit } from "@/lib/gmail";
+import Link from "next/link";
+import { DEFAULT_QUERY, GmailAuthError, searchMessages, withExcludes, type GmailHit } from "@/lib/gmail";
 import { CopyButton } from "./CopyButton";
 import { GmailResults } from "./GmailResults";
+import { GmailFilters } from "./GmailFilters";
 
 export const metadata: Metadata = { title: "E-post – ReceiptMe" };
 
@@ -14,6 +16,13 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
   const urlError = one(params.feil);
   const hasQuery = "q" in params;
   const q = hasQuery ? one(params.q).trim() : DEFAULT_QUERY;
+  // Sidetokens fra Gmail, ett per side vi har bladd forbi, skilt med punktum
+  const pages = one(params.side).split(".").filter((t) => /^[0-9A-Za-z_-]+$/.test(t)).slice(0, 50);
+  const pageLink = (stack: string[]) => {
+    const sp = new URLSearchParams({ q });
+    if (stack.length) sp.set("side", stack.join("."));
+    return `/epost?${sp}`;
+  };
 
   const { supabase, user } = await requireUser();
 
@@ -26,6 +35,8 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
   }
 
   let hits: GmailHit[] = [];
+  let nextPageToken: string | null = null;
+  let estimate = 0;
   let imported: Record<string, string> = {};
   let searchError: string | null = null;
   let gmailEmail = settings?.gmail_email ?? null;
@@ -33,7 +44,12 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
   if (settings?.gmail_refresh_token && q) {
     try {
       const token = await gmailAccessToken(user.id);
-      if (token) hits = await searchMessages(token, q);
+      if (token) {
+        const page = await searchMessages(token, withExcludes(q, settings.gmail_excludes), pages.at(-1));
+        hits = page.hits;
+        nextPageToken = page.nextPageToken;
+        estimate = page.estimate;
+      }
       if (hits.length > 0) {
         const { data } = await supabase
           .from("receipts")
@@ -129,8 +145,36 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
               Vanlig Gmail-søk virker, f.eks. <code>from:komplett.no</code>, <code>has:attachment</code> eller{" "}
               <code>after:2026/01/01</code>.
             </p>
+            {settings && (
+              <GmailFilters
+                excludes={settings.gmail_excludes}
+                minAmount={settings.gmail_min_amount === null ? null : Number(settings.gmail_min_amount)}
+              />
+            )}
             {searchError && <p className="text-sm text-red-600">{searchError}</p>}
-            {!searchError && q && <GmailResults key={q} hits={hits} imported={imported} />}
+            {!searchError && q && (
+              <>
+                <GmailResults
+                  key={`${q}|${pages.join(".")}`}
+                  hits={hits}
+                  imported={imported}
+                  skipped={settings?.gmail_min_amount !== null ? (settings?.gmail_skipped ?? []) : []}
+                  pageLabel={`Side ${pages.length + 1}${estimate > hits.length ? ` · ca. ${estimate} treff` : ""}`}
+                />
+                {(pages.length > 0 || nextPageToken) && (
+                  <nav className="flex items-center justify-between gap-2">
+                    {pages.length > 0 ? (
+                      <Link href={pageLink(pages.slice(0, -1))} className="btn">← Forrige 50</Link>
+                    ) : (
+                      <span />
+                    )}
+                    {nextPageToken && (
+                      <Link href={pageLink([...pages, nextPageToken])} className="btn">Neste 50 →</Link>
+                    )}
+                  </nav>
+                )}
+              </>
+            )}
           </>
         )}
       </section>

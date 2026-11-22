@@ -103,18 +103,36 @@ export type GmailHit = {
   hasAttachment: boolean;
 };
 
-/** Søker i Gmail med vanlig Gmail-søkesyntaks. Returnerer de nyeste treffene. */
-export async function searchMessages(token: string, q: string, max = 30): Promise<GmailHit[]> {
-  const list = await api<{ messages?: { id: string }[] }>(
+/** Legger lagrede unntak til søket, f.eks. «Bolt» blir -from:(Bolt). */
+export function withExcludes(q: string, excludes: string[]) {
+  const parts = excludes
+    .map((e) => e.replace(/["()]/g, "").trim())
+    .filter(Boolean)
+    .map((e) => (/\s/.test(e) ? `-from:"${e}"` : `-from:(${e})`));
+  return [q, ...parts].join(" ").trim();
+}
+
+export type GmailPage = { hits: GmailHit[]; nextPageToken: string | null; estimate: number };
+
+/** Søker i Gmail med vanlig Gmail-søkesyntaks. Returnerer én side med de nyeste treffene. */
+export async function searchMessages(token: string, q: string, pageToken?: string, max = 50): Promise<GmailPage> {
+  const params = new URLSearchParams({ q, maxResults: String(max) });
+  if (pageToken) params.set("pageToken", pageToken);
+  const list = await api<{ messages?: { id: string }[]; nextPageToken?: string; resultSizeEstimate?: number }>(
     token,
-    `/messages?${new URLSearchParams({ q, maxResults: String(max) })}`,
+    `/messages?${params}`,
   );
   const ids = (list.messages ?? []).map((m) => m.id);
   const meta = new URLSearchParams({ format: "metadata" });
   for (const h of ["From", "Subject", "Date"]) meta.append("metadataHeaders", h);
 
-  const messages = await Promise.all(ids.map((id) => api<Message & { payload?: Part }>(token, `/messages/${id}?${meta}`)));
-  return messages.map((m) => ({
+  // Maks 10 samtidig, så vi holder oss under Gmail sin fartsgrense
+  const messages: Message[] = [];
+  for (let i = 0; i < ids.length; i += 10) {
+    const chunk = ids.slice(i, i + 10);
+    messages.push(...(await Promise.all(chunk.map((id) => api<Message>(token, `/messages/${id}?${meta}`)))));
+  }
+  const hits = messages.map((m) => ({
     id: m.id,
     from: headerValue(m.payload?.headers, "From"),
     subject: headerValue(m.payload?.headers, "Subject") || "(uten emne)",
@@ -122,6 +140,7 @@ export async function searchMessages(token: string, q: string, max = 30): Promis
     snippet: m.snippet ?? "",
     hasAttachment: (m.payload?.mimeType ?? "").startsWith("multipart/mixed"),
   }));
+  return { hits, nextPageToken: list.nextPageToken ?? null, estimate: list.resultSizeEstimate ?? hits.length };
 }
 
 /** Henter hele e-posten og gjør den klar for import. */
