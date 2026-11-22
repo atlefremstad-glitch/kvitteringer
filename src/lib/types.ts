@@ -29,6 +29,9 @@ export type Receipt = {
   note: string | null;
   source: "upload" | "gmail" | "email";
   source_ref: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
   raw_ai: unknown;
   ai_error: string | null;
 };

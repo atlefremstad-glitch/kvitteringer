@@ -6,6 +6,7 @@ import { BUCKET } from "@/lib/process";
 import type { Receipt } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EditForm } from "./EditForm";
+import { LocationCard } from "./LocationCard";
 
 export const metadata: Metadata = { title: "Kvittering – Kvitteringer" };
 export const maxDuration = 60;
@@ -69,8 +70,16 @@ export default async function ReceiptPage({ params }: PageProps<"/kvittering/[id
           )}
         </section>
 
-        <section>
+        <section className="space-y-4">
           <EditForm receipt={receipt} />
+          <LocationCard
+            id={receipt.id}
+            merchant={receipt.merchant}
+            address={receipt.address}
+            latitude={receipt.latitude}
+            longitude={receipt.longitude}
+            status={receipt.status}
+          />
         </section>
       </div>
     </div>
