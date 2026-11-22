@@ -11,6 +11,8 @@ Next.js + Supabase (innlogging, database, fillagring) + Claude (leser kvittering
 - Liste med søk, filter på kategori og datoperiode, og sum for det som vises.
 - Detaljside der alt kan redigeres, og kvitteringen kan slettes.
 - Feiler AI-en, lagres kvitteringen med status «Må sjekkes».
+- Søk i Gmail etter kvitteringer og importer dem (siden **E-post**).
+- Personlig videresendings-adresse: send en kvittering dit, så legges den inn automatisk.
 
 ## Oppsett, steg for steg
 
@@ -34,7 +36,8 @@ Gå til **Project Settings** → **API Keys** (eller trykk **Connect** øverst):
 - **Publishable key** (`sb_publishable_…`) → blir `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
   (har prosjektet bare den gamle **anon**-nøkkelen, bruk den.)
 
-Ikke bruk `service_role`/secret-nøkkelen. Appen trenger den ikke.
+- **Secret key** (`sb_secret_…`, eller den gamle `service_role`) → blir `SUPABASE_SECRET_KEY`.
+  Den brukes bare på serveren til e-post-import. Del den aldri og bruk aldri `NEXT_PUBLIC_` foran.
 
 ### 3. Publiser på Vercel
 
@@ -77,6 +80,56 @@ Supabase sin innebygde e-posttjeneste sender bare noen få e-poster i timen. Det
 
 - **iPhone (Safari):** Del-knappen → **Legg til på Hjem-skjerm**.
 - **Android (Chrome):** menyen ⋮ → **Installer app** / **Legg til på startskjermen**.
+
+## Kvitteringer fra e-post
+
+Siden **E-post** i appen har to ting: søk i Gmail, og en personlig adresse du kan videresende kvitteringer til.
+Har e-posten en PDF eller et bilde som vedlegg, leser AI-en vedlegget. Ellers leser den selve teksten i e-posten.
+
+### A. Videresendings-adresse (Postmark)
+
+Postmark tar imot e-posten og sender den til appen. Gratis for 100 e-poster i måneden, og du trenger ikke eget domene.
+
+1. Lag en gratis konto på [postmarkapp.com](https://postmarkapp.com).
+2. Lag en **Server** (f.eks. «Kvitteringer»). Åpne **Default Inbound Stream** → **Setup instructions** / **Settings**.
+3. Kopier **Inbound address** (ser ut som `abc123@inbound.postmarkapp.com`).
+4. Lag en hemmelig nøkkel: en lang tilfeldig tekst med bare bokstaver og tall (minst 32 tegn, f.eks. fra passordgeneratoren din).
+5. I Postmark, feltet **Webhook URL**:
+   `https://DIN-APP.vercel.app/api/inbound/postmark?key=DIN-HEMMELIGE-NØKKEL` → **Save**.
+6. I Vercel → **Settings** → **Environment Variables**, legg inn:
+
+   | Navn | Verdi |
+   |---|---|
+   | `POSTMARK_INBOUND_ADDRESS` | Inbound-adressen fra punkt 3 |
+   | `INBOUND_WEBHOOK_SECRET` | Nøkkelen fra punkt 4 |
+   | `SUPABASE_SECRET_KEY` | Secret key fra Supabase (steg 2 over) |
+
+7. **Redeploy**. Åpne **E-post** i appen. Der står din personlige adresse (`abc123+<kode>@inbound.postmarkapp.com`).
+
+Automatisk videresending fra Gmail: Gmail → Innstillinger → **Videresending og POP/IMAP** → legg til adressen.
+Gmail sender da en bekreftelseskode. Den dukker opp på **E-post**-siden i appen. Lag så et filter (f.eks. `from:komplett.no`) som videresender til adressen.
+
+Vedlegg over ca. 3 MB kommer ikke gjennom (grense hos Vercel).
+
+### B. Søk i Gmail (Google Cloud)
+
+1. Gå til [console.cloud.google.com](https://console.cloud.google.com) og lag et nytt prosjekt, f.eks. «Kvitteringer».
+2. **APIs & Services** → **Library** → søk «Gmail API» → **Enable**.
+3. **Google Auth Platform** (heter også **OAuth consent screen**) → **Get started**:
+   app-navn «Kvitteringer», din e-post, **Audience: External** → **Create**.
+4. **Audience** → **Test users** → **Add users** → din Gmail-adresse → **Save**.
+5. **Data Access** → **Add or remove scopes** → lim inn `https://www.googleapis.com/auth/gmail.readonly` → **Update** → **Save**.
+6. **Clients** → **Create client** → **Web application**. Under **Authorized redirect URIs** → **Add URI**:
+   - `https://DIN-APP.vercel.app/api/gmail/callback`
+   - `http://localhost:3000/api/gmail/callback` (bare hvis du kjører lokalt)
+7. Trykk **Create** og kopier **Client ID** og **Client secret** inn i Vercel som `GOOGLE_CLIENT_ID` og `GOOGLE_CLIENT_SECRET`. **Redeploy**.
+8. I appen: **E-post** → **Koble til Gmail**. Google sier at appen ikke er verifisert: trykk **Fortsett** (det er din egen app).
+
+Mens appen står i «Testing» hos Google, må du koble til Gmail på nytt hver 7. dag.
+Vil du slippe det: **Audience** → **Publish app**. Advarselen om uverifisert app vises fortsatt, men tilgangen varer.
+Skal appen selges til andre, må Google godkjenne den (gjelder fordi den leser e-post).
+
+Bruk produksjons-adressen fra Vercel, ikke en preview-adresse. Google godtar bare adressene du la inn i punkt 6.
 
 ## Kjøre lokalt (valgfritt)
 

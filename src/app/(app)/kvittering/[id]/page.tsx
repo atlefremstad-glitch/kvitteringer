@@ -23,18 +23,35 @@ export default async function ReceiptPage({ params }: PageProps<"/kvittering/[id
   const fileUrl = signed?.signedUrl ?? null;
   const isPdf = receipt.file_type === "application/pdf";
   const isHeic = receipt.file_type === "image/heic" || receipt.file_type === "image/heif";
+  const isText = receipt.file_type === "text/plain";
+
+  // E-post uten vedlegg er lagret som tekst. Vis teksten direkte.
+  let emailText: string | null = null;
+  if (isText) {
+    const { data: blob } = await supabase.storage.from(BUCKET).download(receipt.file_path);
+    emailText = blob ? await blob.text() : null;
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <Link href="/" className="text-sm underline">← Alle kvitteringer</Link>
-        <StatusBadge status={receipt.status} />
+        <div className="flex items-center gap-2">
+          {receipt.source && receipt.source !== "upload" && (
+            <span className="text-xs text-muted">{receipt.source === "gmail" ? "Fra Gmail" : "Videresendt e-post"}</span>
+          )}
+          <StatusBadge status={receipt.status} />
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="card overflow-hidden md:sticky md:top-20 md:self-start">
           {!fileUrl ? (
             <p className="p-6 text-sm text-muted">Fant ikke filen.</p>
+          ) : isText ? (
+            <pre className="max-h-[80vh] overflow-auto whitespace-pre-wrap break-words p-4 text-xs">
+              {emailText ?? "Kunne ikke lese e-posten."}
+            </pre>
           ) : isPdf ? (
             <iframe src={fileUrl} title="Kvittering (PDF)" className="h-[70vh] w-full bg-white" />
           ) : isHeic ? (

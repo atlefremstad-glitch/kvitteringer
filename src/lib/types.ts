@@ -27,6 +27,8 @@ export type Receipt = {
   items: ReceiptItem[];
   confidence: number | null;
   note: string | null;
+  source: "upload" | "gmail" | "email";
+  source_ref: string | null;
   raw_ai: unknown;
   ai_error: string | null;
 };

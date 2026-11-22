@@ -88,17 +88,24 @@ function systemPrompt() {
     `- Velg én kategori fra listen: ${CATEGORIES.join(", ")}.`,
     "- confidence: 1 = alt er tydelig lesbart, 0 = nesten ingenting kunne leses.",
     "- Hvis filen ikke er en kvittering, sett confidence lavt og felt til null.",
+    "- Kvitteringen kan komme fra en e-post (ordrebekreftelse, kvittering eller faktura).",
+    "  Mangler kjøpsdato, bruk datoen e-posten ble sendt. Butikken er avsenderen, ikke den som videresendte.",
+    "  Er e-posten reklame, nyhetsbrev eller ikke et kjøp, sett confidence under 0.3.",
   ].join("\n");
 }
 
 type FileContent =
   | { kind: "image"; base64: string }
-  | { kind: "pdf"; base64: string };
+  | { kind: "pdf"; base64: string }
+  | { kind: "text"; text: string };
 
-/** Gjør filen klar for Claude: bilder skaleres ned til JPEG, PDF sendes som den er. */
+/** Gjør filen klar for Claude: bilder skaleres ned til JPEG, PDF og tekst sendes som de er. */
 export async function prepareForClaude(buffer: Buffer, mimeType: string): Promise<FileContent> {
   if (mimeType === "application/pdf") {
     return { kind: "pdf", base64: buffer.toString("base64") };
+  }
+  if (mimeType === "text/plain") {
+    return { kind: "text", text: buffer.toString("utf8").slice(0, 100_000) };
   }
   const jpeg = await sharp(buffer)
     .rotate() // følg EXIF-orientering fra mobilkamera
@@ -138,7 +145,7 @@ function clean(raw: Record<string, unknown>): Extracted {
 }
 
 /** Sender kvitteringen til Claude og returnerer tolkede felt. Kaster aldri. */
-export async function extractReceipt(file: FileContent): Promise<ExtractResult> {
+export async function extractReceipt(file: FileContent, context?: string): Promise<ExtractResult> {
   if (!process.env.ANTHROPIC_API_KEY) {
     return { ok: false, error: "ANTHROPIC_API_KEY mangler på serveren.", raw: null };
   }
@@ -147,7 +154,10 @@ export async function extractReceipt(file: FileContent): Promise<ExtractResult> 
   const fileBlock: Anthropic.Beta.Messages.BetaContentBlockParam =
     file.kind === "pdf"
       ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: file.base64 } }
-      : { type: "image", source: { type: "base64", media_type: "image/jpeg", data: file.base64 } };
+      : file.kind === "text"
+        ? { type: "text", text: `<epost>\n${file.text}\n</epost>` }
+        : { type: "image", source: { type: "base64", media_type: "image/jpeg", data: file.base64 } };
+  const instruction = context ? `${context}\n\nLes denne kvitteringen.` : "Les denne kvitteringen.";
 
   try {
     const response = await client.beta.messages.create({
@@ -164,7 +174,7 @@ export async function extractReceipt(file: FileContent): Promise<ExtractResult> 
       messages: [
         {
           role: "user",
-          content: [fileBlock, { type: "text", text: "Les denne kvitteringen." }],
+          content: [fileBlock, { type: "text", text: instruction }],
         },
       ],
     });
