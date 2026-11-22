@@ -6,8 +6,13 @@
   --foreground: #1b1b1a;
   --muted: #6b6b66;
   --border: #e3e3de;
-  --accent: #0f766e;
+  --accent: #0a7a5f;
   --accent-foreground: #ffffff;
+  /* ReceiptMe-logoens grønne overgang */
+  --brand-from: #056b5a;
+  --brand-to: #2f9565;
+  --brand-text-from: #056b5a;
+  --brand-text-to: #5fbf6a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,8 +22,10 @@
     --foreground: #ededea;
     --muted: #a3a39c;
     --border: #2f2f2c;
-    --accent: #2dd4bf;
-    --accent-foreground: #042f2e;
+    --accent: #5fcf86;
+    --accent-foreground: #052e22;
+    --brand-text-from: #5fcf86;
+    --brand-text-to: #b5e67f;
   }
 }
 
@@ -50,7 +57,14 @@ body {
     @apply inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-background disabled:opacity-50;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:opacity-90 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50;
+    background-image: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  }
+  .brand-text {
+    background-image: linear-gradient(135deg, var(--brand-text-from), var(--brand-text-to));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950;
