@@ -19,6 +19,8 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
   const kategori = one(params.kategori);
   const fra = one(params.fra);
   const til = one(params.til);
+  const overText = one(params.over).replace(/\s/g, "").replace(",", ".");
+  const over = overText !== "" && Number.isFinite(Number(overText)) ? Number(overText) : null;
 
   const { supabase } = await requireUser();
 
@@ -33,6 +35,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
   if ((CATEGORIES as readonly string[]).includes(kategori)) query = query.eq("category", kategori);
   if (isIsoDate(fra)) query = query.gte("purchase_date", fra);
   if (isIsoDate(til)) query = query.lte("purchase_date", til);
+  if (over !== null) query = query.gt("total", over);
 
   const { data, error } = await query;
   const rows = (data ?? []) as Row[];
@@ -44,11 +47,11 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
     sums.set(r.currency, (sums.get(r.currency) ?? 0) + Number(r.total));
   }
   const sumEntries = [...sums.entries()].sort(([a], [b]) => (a === "NOK" ? -1 : b === "NOK" ? 1 : a.localeCompare(b)));
-  const filtered = Boolean(q || kategori || fra || til);
+  const filtered = Boolean(q || kategori || fra || til || over !== null);
 
   return (
     <div className="space-y-4">
-      <form className="card grid grid-cols-2 gap-3 p-3 sm:grid-cols-5" method="get">
+      <form className="card grid grid-cols-2 gap-3 p-3 sm:grid-cols-6" method="get">
         <div className="col-span-2">
           <label className="label" htmlFor="q">Søk på butikk</label>
           <input id="q" name="q" defaultValue={q} className="input" placeholder="F.eks. Rema" />
@@ -70,7 +73,11 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
           <label className="label" htmlFor="til">Til dato</label>
           <input id="til" name="til" type="date" defaultValue={til} className="input" />
         </div>
-        <div className="col-span-2 flex gap-2 sm:col-span-5">
+        <div>
+          <label className="label" htmlFor="over">Beløp over (kr)</label>
+          <input id="over" name="over" inputMode="decimal" defaultValue={one(params.over)} className="input" placeholder="0" />
+        </div>
+        <div className="col-span-2 flex gap-2 sm:col-span-6">
           <button className="btn-primary" type="submit">Filtrer</button>
           {filtered && <Link href="/" className="btn">Nullstill</Link>}
         </div>
