@@ -3,19 +3,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { receiptPreview, type Preview } from "./actions";
 
-const DELAY_MS = 250;
-const WIDTH = 420;
+const SHOW_DELAY_MS = 250;
+// Tid til å flytte musen fra raden og inn i bildet før det lukkes
+const HIDE_DELAY_MS = 400;
+// Stort nok til å lese kvitteringen: halve skjermen, minst 480 og maks 900 px
+const panelWidth = (vw: number) => Math.min(900, Math.max(480, vw / 2 - 32), vw - 32);
+
+type State = { id: string; preview: Preview | null; x: number; y: number };
 
 /**
  * Viser et stort bilde av kvitteringen når musen holdes over en rad.
- * Bare på enheter med mus (ikke mobil/nettbrett). Lenkene hentes når de trengs og huskes.
+ * Flytt musen inn i bildet for å bla i det. Bare på enheter med mus.
  */
 export function useHoverPreview() {
   const cache = useRef(new Map<string, Promise<Preview>>());
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const activeId = useRef<string | null>(null);
+  const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wanted = useRef<string | null>(null);
   const [enabled, setEnabled] = useState(false);
-  const [state, setState] = useState<{ id: string; preview: Preview | null; x: number; y: number } | null>(null);
+  const [state, setState] = useState<State | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 768px)");
@@ -34,11 +40,25 @@ export function useHoverPreview() {
     return p;
   }, []);
 
-  const hide = useCallback(() => {
-    if (timer.current) clearTimeout(timer.current);
-    activeId.current = null;
-    setState(null);
+  const clearTimers = useCallback(() => {
+    if (showTimer.current) clearTimeout(showTimer.current);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    showTimer.current = null;
+    hideTimer.current = null;
   }, []);
+
+  const hide = useCallback(() => {
+    clearTimers();
+    wanted.current = null;
+    setState(null);
+  }, [clearTimers]);
+
+  const scheduleHide = useCallback(() => {
+    if (showTimer.current) clearTimeout(showTimer.current);
+    showTimer.current = null;
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(hide, HIDE_DELAY_MS);
+  }, [hide]);
 
   const handlers = useCallback(
     (id: string) =>
@@ -46,59 +66,77 @@ export function useHoverPreview() {
         ? {
             onMouseEnter: (e: React.MouseEvent) => {
               const { clientX: x, clientY: y } = e;
-              activeId.current = id;
-              if (timer.current) clearTimeout(timer.current);
-              timer.current = setTimeout(async () => {
+              clearTimers();
+              wanted.current = id;
+              showTimer.current = setTimeout(async () => {
+                // Bildet blir stående der det åpnet, så musen kan flyttes inn i det
                 setState({ id, preview: null, x, y });
                 const preview = await load(id);
-                if (activeId.current === id) setState((s) => (s && s.id === id ? { ...s, preview } : s));
-              }, DELAY_MS);
+                if (wanted.current === id) setState((s) => (s && s.id === id ? { ...s, preview } : s));
+              }, SHOW_DELAY_MS);
             },
-            onMouseMove: (e: React.MouseEvent) => {
-              const { clientX: x, clientY: y } = e;
-              setState((s) => (s && s.id === id ? { ...s, x, y } : s));
-            },
-            onMouseLeave: hide,
+            onMouseLeave: scheduleHide,
           }
         : {},
-    [enabled, load, hide],
+    [enabled, load, clearTimers, scheduleHide],
   );
 
-  // Skjul ved scrolling og klikk, så den ikke henger igjen
+  // Lukk når siden (ikke bildet) rulles, eller med Esc
   useEffect(() => {
     if (!state) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && hide();
     window.addEventListener("scroll", hide, { passive: true });
-    return () => window.removeEventListener("scroll", hide);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("scroll", hide);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [state, hide]);
 
-  const panel = state && state.preview?.kind !== "none" ? <PreviewPanel {...state} /> : null;
+  const panel =
+    state && state.preview?.kind !== "none" ? (
+      <PreviewPanel {...state} onEnter={clearTimers} onLeave={scheduleHide} />
+    ) : null;
   return { handlers, panel, hide };
 }
 
-function PreviewPanel({ preview, x, y }: { preview: Preview | null; x: number; y: number }) {
+function PreviewPanel({
+  preview,
+  x,
+  onEnter,
+  onLeave,
+}: State & { onEnter: () => void; onLeave: () => void }) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const height = Math.min(vh - 32, 640);
+  const width = panelWidth(vw);
+  const height = vh - 32; // hele skjermhøyden
   // Til venstre for pekeren hvis den er på høyre halvdel, ellers til høyre
-  const left = x > vw / 2 ? Math.max(16, x - WIDTH - 24) : Math.min(vw - WIDTH - 16, x + 24);
-  const top = Math.min(Math.max(16, y - height / 2), vh - height - 16);
+  const left = x > vw / 2 ? Math.max(16, x - width - 16) : Math.min(vw - width - 16, x + 16);
+  const top = 16;
 
   return (
     <div
-      className="card pointer-events-none fixed z-50 overflow-hidden shadow-2xl"
-      style={{ left, top, width: WIDTH, height }}
-      aria-hidden
+      className="card fixed z-50 flex flex-col overflow-hidden shadow-2xl"
+      style={{ left, top, width, height }}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
     >
-      {!preview ? (
-        <div className="flex h-full items-center justify-center text-sm text-muted">Laster …</div>
-      ) : preview.kind === "image" ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={preview.url} alt="" className="h-full w-full bg-white object-contain" />
-      ) : preview.kind === "pdf" ? (
-        <iframe src={`${preview.url}#toolbar=0&navpanes=0&view=FitH`} title="Kvittering (PDF)" className="h-full w-full bg-white" />
-      ) : preview.kind === "text" ? (
-        <pre className="h-full overflow-hidden whitespace-pre-wrap break-words p-4 text-xs">{preview.text}</pre>
-      ) : null}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white">
+        {!preview ? (
+          <div className="flex h-full items-center justify-center text-sm text-muted">Laster …</div>
+        ) : preview.kind === "image" ? (
+          // Full bredde, så lange kvitteringer kan rulles
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={preview.url} alt="Kvittering" className="block h-auto w-full" />
+        ) : preview.kind === "pdf" ? (
+          <iframe src={`${preview.url}#toolbar=0&navpanes=0&view=FitH`} title="Kvittering (PDF)" className="h-full w-full" />
+        ) : preview.kind === "text" ? (
+          <pre className="whitespace-pre-wrap break-words p-4 text-xs text-black">{preview.text}</pre>
+        ) : null}
+      </div>
+      <p className="border-t border-border bg-surface px-3 py-1.5 text-xs text-muted">
+        Flytt musen inn i bildet for å bla. Esc lukker.
+      </p>
     </div>
   );
 }
