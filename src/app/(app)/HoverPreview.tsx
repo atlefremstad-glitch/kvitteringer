@@ -6,8 +6,10 @@ import { receiptPreview, type Preview } from "./actions";
 const SHOW_DELAY_MS = 250;
 // Tid til å flytte musen fra raden og inn i bildet før det lukkes
 const HIDE_DELAY_MS = 400;
-// Stort nok til å lese kvitteringen: halve skjermen, minst 480 og maks 900 px
-const panelWidth = (vw: number) => Math.min(900, Math.max(480, vw / 2 - 32), vw - 32);
+// Mellomstørrelse: ca. en tredjedel av skjermen, minst 420 og maks 640 px
+const panelWidth = (vw: number) => Math.min(640, Math.max(420, vw * 0.35), vw - 32);
+// 80 % av skjermhøyden
+const panelHeight = (vh: number) => Math.min(vh - 32, Math.round(vh * 0.8));
 
 type State = { id: string; preview: Preview | null; x: number; y: number };
 
@@ -103,16 +105,17 @@ export function useHoverPreview() {
 function PreviewPanel({
   preview,
   x,
+  y,
   onEnter,
   onLeave,
 }: State & { onEnter: () => void; onLeave: () => void }) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const width = panelWidth(vw);
-  const height = vh - 32; // hele skjermhøyden
+  const height = panelHeight(vh);
   // Til venstre for pekeren hvis den er på høyre halvdel, ellers til høyre
   const left = x > vw / 2 ? Math.max(16, x - width - 16) : Math.min(vw - width - 16, x + 16);
-  const top = 16;
+  const top = Math.min(Math.max(16, y - height / 2), vh - height - 16);
 
   return (
     <div
