@@ -21,6 +21,7 @@ function toInput(r: Receipt): ReceiptInput {
     vat: amountText(r.vat),
     payment_method: r.payment_method ?? "",
     category: r.category ?? "",
+    note: r.note ?? "",
     items: (r.items ?? []).map((i) => ({
       name: i.name ?? "",
       quantity: qtyText(i.quantity),
@@ -128,6 +129,19 @@ export function EditForm({ receipt }: { receipt: Receipt }) {
           <label className="label" htmlFor="org">Organisasjonsnummer</label>
           <input id="org" className="input" inputMode="numeric" value={form.org_number} onChange={(e) => set("org_number", e.target.value)} />
         </div>
+      </div>
+
+      <div>
+        <label className="label" htmlFor="note">Notat</label>
+        <textarea
+          id="note"
+          className="input min-h-20"
+          rows={3}
+          maxLength={2000}
+          placeholder="F.eks. garanti til 2028, gave til mamma, refunderes av jobben"
+          value={form.note}
+          onChange={(e) => set("note", e.target.value)}
+        />
       </div>
 
       <div>

@@ -26,6 +26,7 @@ export type Receipt = {
   category: Category | null;
   items: ReceiptItem[];
   confidence: number | null;
+  note: string | null;
   raw_ai: unknown;
   ai_error: string | null;
 };
