@@ -20,8 +20,8 @@ Du trenger kontoer hos GitHub, Supabase, Vercel og Anthropic.
 
 1. Åpne prosjektet ditt på [supabase.com/dashboard](https://supabase.com/dashboard).
 2. Gå til **SQL Editor** → **New query**.
-3. Åpne filen [`supabase/migrations/20261122000000_init.sql`](supabase/migrations/20261122000000_init.sql) her i GitHub, kopier alt og lim det inn.
-4. Trykk **Run**. Du skal se «Success. No rows returned».
+3. Åpne filene i [`supabase/migrations/`](supabase/migrations/) i rekkefølge (eldste først). Kopier alt fra én fil, lim inn og kjør, og gjør det samme for neste.
+4. Trykk **Run** for hver fil. Du skal se «Success. No rows returned».
 
 Dette lager tabellen `receipts`, sikkerhetsreglene (Row Level Security) og en privat lagringsbøtte `receipts`.
 Du kan sjekke under **Table Editor** (tabellen `receipts`) og **Storage** (bøtta `receipts`).
