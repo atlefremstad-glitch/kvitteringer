@@ -20,6 +20,10 @@ export default async function ReceiptPage({ params }: PageProps<"/kvittering/[id
   if (!data) notFound();
   const receipt = data as Receipt;
 
+  const { data: project } = receipt.project_id
+    ? await supabase.from("projects").select("id, name").eq("id", receipt.project_id).maybeSingle()
+    : { data: null };
+
   const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(receipt.file_path, 60 * 60);
   const fileUrl = signed?.signedUrl ?? null;
   const isPdf = receipt.file_type === "application/pdf";
@@ -38,6 +42,11 @@ export default async function ReceiptPage({ params }: PageProps<"/kvittering/[id
       <div className="flex items-center justify-between gap-2">
         <Link href="/" className="text-sm underline">← Alle kvitteringer</Link>
         <div className="flex items-center gap-2">
+          {project && (
+            <Link href={`/prosjekter/${project.id}`} className="rounded-full border border-accent px-2 py-0.5 text-xs text-accent">
+              {project.name as string}
+            </Link>
+          )}
           {receipt.source && receipt.source !== "upload" && (
             <span className="text-xs text-muted">{receipt.source === "gmail" ? "Fra Gmail" : "Videresendt e-post"}</span>
           )}

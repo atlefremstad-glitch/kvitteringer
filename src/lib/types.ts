@@ -32,6 +32,7 @@ export type Receipt = {
   address: string | null;
   latitude: number | null;
   longitude: number | null;
+  project_id: string | null;
   raw_ai: unknown;
   ai_error: string | null;
 };
@@ -40,4 +41,12 @@ export const STATUS_LABEL: Record<ReceiptStatus, string> = {
   processing: "Behandles",
   ok: "OK",
   needs_review: "Må sjekkes",
+};
+
+export type Project = {
+  id: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  name: string;
 };

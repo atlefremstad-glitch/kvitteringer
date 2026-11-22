@@ -1,15 +1,10 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { CATEGORIES } from "@/lib/categories";
-import { formatAmount, formatDate } from "@/lib/format";
-import type { Receipt } from "@/lib/types";
-import { StatusBadge } from "@/components/StatusBadge";
+import { formatAmount } from "@/lib/format";
 import { periods } from "@/lib/periods";
-
-type Row = Pick<
-  Receipt,
-  "id" | "merchant" | "purchase_date" | "total" | "currency" | "category" | "status" | "created_at" | "note"
->;
+import { sumByCurrency } from "@/lib/sums";
+import { ReceiptList, type ReceiptRow } from "./ReceiptList";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 const isIsoDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -39,7 +34,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
 
   let query = supabase
     .from("receipts")
-    .select("id, merchant, purchase_date, total, currency, category, status, created_at, note")
+    .select("id, merchant, purchase_date, total, currency, category, status, created_at, note, project_id")
     .order("purchase_date", { ascending: false, nullsFirst: true })
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -50,16 +45,15 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
   if (isIsoDate(til)) query = query.lte("purchase_date", til);
   if (over !== null) query = query.gt("total", over);
 
-  const { data, error } = await query;
-  const rows = (data ?? []) as Row[];
+  const [{ data, error }, { data: projectData }] = await Promise.all([
+    query,
+    supabase.from("projects").select("id, name").order("created_at", { ascending: false }),
+  ]);
+  const rows = (data ?? []) as ReceiptRow[];
+  const projects = (projectData ?? []) as { id: string; name: string }[];
 
   // Sum per valuta for det som er filtrert
-  const sums = new Map<string, number>();
-  for (const r of rows) {
-    if (r.total === null) continue;
-    sums.set(r.currency, (sums.get(r.currency) ?? 0) + Number(r.total));
-  }
-  const sumEntries = [...sums.entries()].sort(([a], [b]) => (a === "NOK" ? -1 : b === "NOK" ? 1 : a.localeCompare(b)));
+  const sumEntries = sumByCurrency(rows);
   const filtered = Boolean(q || kategori || fra || til || over !== null);
 
   return (
@@ -132,26 +126,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
           {!filtered && <Link href="/ny" className="btn-primary">Legg til første kvittering</Link>}
         </div>
       ) : (
-        <ul className="card divide-y divide-border overflow-hidden">
-          {rows.map((r) => (
-            <li key={r.id}>
-              <Link href={`/kvittering/${r.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-background">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{r.merchant ?? "Ukjent butikk"}</p>
-                  <p className="truncate text-sm text-muted">
-                    {formatDate(r.purchase_date)}
-                    {r.category ? ` · ${r.category}` : ""}
-                  </p>
-                  {r.note && <p className="truncate text-sm italic text-muted">{r.note}</p>}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="font-semibold tabular-nums">{formatAmount(r.total, r.currency)}</span>
-                  {r.status !== "ok" && <StatusBadge status={r.status} />}
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <ReceiptList rows={rows} projects={projects} />
       )}
     </div>
   );
