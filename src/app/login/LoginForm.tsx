@@ -1,8 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+
+const noopSubscribe = () => () => {};
+
+function isStandalone() {
+  const nav = window.navigator as Navigator & { standalone?: boolean };
+  return nav.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -13,14 +20,7 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   // Appen lagt til på hjem-skjermen (iPhone) har egen lagring, så lenken
   // i e-posten logger bare inn Safari. Der må koden brukes.
-  const [standalone, setStandalone] = useState(false);
-
-  useEffect(() => {
-    const nav = window.navigator as Navigator & { standalone?: boolean };
-    setStandalone(
-      nav.standalone === true || window.matchMedia("(display-mode: standalone)").matches,
-    );
-  }, []);
+  const standalone = useSyncExternalStore(noopSubscribe, isStandalone, () => false);
 
   async function sendLink(e: React.FormEvent) {
     e.preventDefault();
