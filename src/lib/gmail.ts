@@ -126,7 +126,12 @@ export async function searchMessages(token: string, q: string, pageToken?: strin
   const meta = new URLSearchParams({ format: "metadata" });
   for (const h of ["From", "Subject", "Date"]) meta.append("metadataHeaders", h);
 
-  const messages = await Promise.all(ids.map((id) => api<Message & { payload?: Part }>(token, `/messages/${id}?${meta}`)));
+  // Maks 10 samtidig, så vi holder oss under Gmail sin fartsgrense
+  const messages: Message[] = [];
+  for (let i = 0; i < ids.length; i += 10) {
+    const chunk = ids.slice(i, i + 10);
+    messages.push(...(await Promise.all(chunk.map((id) => api<Message>(token, `/messages/${id}?${meta}`)))));
+  }
   const hits = messages.map((m) => ({
     id: m.id,
     from: headerValue(m.payload?.headers, "From"),
@@ -137,7 +142,6 @@ export async function searchMessages(token: string, q: string, pageToken?: strin
   }));
   return { hits, nextPageToken: list.nextPageToken ?? null, estimate: list.resultSizeEstimate ?? hits.length };
 }
-
 
 /** Henter hele e-posten og gjør den klar for import. */
 export async function fetchEmail(token: string, id: string): Promise<IncomingEmail> {
