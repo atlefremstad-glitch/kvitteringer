@@ -28,8 +28,8 @@ export function parseAmount(intPart: string, sep?: string, dec?: string): number
   return Number.isFinite(n) ? n : null;
 }
 
-function amountsIn(line: string): { value: number; strong: boolean }[] {
-  const out: { value: number; strong: boolean }[] = [];
+function amountsIn(line: string): { value: number; strong: boolean; index: number }[] {
+  const out: { value: number; strong: boolean; index: number }[] = [];
   for (const m of line.matchAll(NUMBER)) {
     const value = parseAmount(m[1], m[2], m[3]);
     if (value === null || value <= 0 || value > 1_000_000) continue;
@@ -40,7 +40,7 @@ function amountsIn(line: string): { value: number; strong: boolean }[] {
     if (!hasDecimals && !hasCurrency) continue;
     // Årstall som 2026 uten valuta
     if (!hasCurrency && value >= 1900 && value <= 2100 && !m[3]) continue;
-    out.push({ value, strong: hasCurrency });
+    out.push({ value, strong: hasCurrency, index: m.index });
   }
   return out;
 }
@@ -72,4 +72,33 @@ export function estimateTotal(text: string): number | null {
   // Siste utvei: største beløp med valuta i hele teksten
   const withCurrency = lines.filter((l) => !isSkip(l)).flatMap((l) => amountsIn(l).filter((a) => a.strong));
   return withCurrency.length ? Math.max(...withCurrency.map((a) => a.value)) : null;
+}
+
+const NOT_PRODUCT =
+  /(totalt?|sum|beløp|amount|betal|paid|mva|moms|\bvat\b|\btax\b|rabatt|discount|frakt|shipping|levering|delivery|gebyr|fee|ordre|order|faktura|invoice|kvittering|receipt|dato|date|kort|card|visa|mastercard|vipps|saldo|balance|tips)/i;
+
+/**
+ * Gjetter hovedproduktet: varelinjen med høyest pris (navn og pris på samme linje).
+ * Uten AI, så den treffer best på e-poster med en vanlig varetabell.
+ */
+export function estimateMainItem(text: string): string | null {
+  let best: { name: string; value: number } | null = null;
+  for (const raw of text.split(/\n/)) {
+    const line = raw.replace(/\s+/g, " ").trim();
+    if (line.length < 4 || line.length > 160 || isSkip(line) || NOT_PRODUCT.test(line)) continue;
+    const amounts = amountsIn(line);
+    if (amounts.length === 0) continue;
+    // Navnet er teksten før første beløp, uten antall (som «1» eller «2 x») og valuta
+    const name = line
+      .slice(0, amounts[0].index)
+      .replace(/\b(kr|nok|eur|usd)\.?\s*$/i, "")
+      .replace(/[$€£]\s*$/, "")
+      .replace(/(\s+\d{1,3}\s*(x|×|stk\.?)?)+\s*$/i, "")
+      .replace(/[\s:–—\-x×@]+$/i, "")
+      .trim();
+    if (name.length < 3 || !/[a-zæøå]{3}/i.test(name)) continue;
+    const value = Math.max(...amounts.map((a) => a.value));
+    if (!best || value > best.value) best = { name: name.slice(0, 80), value };
+  }
+  return best?.name ?? null;
 }

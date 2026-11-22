@@ -10,8 +10,16 @@ import { groupIntoProject } from "./prosjekter/actions";
 
 export type ReceiptRow = Pick<
   Receipt,
-  "id" | "merchant" | "purchase_date" | "total" | "currency" | "category" | "status" | "created_at" | "note" | "project_id"
+  "id" | "merchant" | "purchase_date" | "total" | "currency" | "category" | "status" | "created_at" | "note" | "project_id" | "items"
 >;
+
+/** Varelinjen med høyest pris, som et kort svar på «hva kjøpte jeg?». */
+function mainItem(items: ReceiptRow["items"]) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  const best = items.reduce((a, b) => ((b.price ?? -Infinity) > (a.price ?? -Infinity) ? b : a));
+  const rest = items.length - 1;
+  return rest > 0 ? `${best.name} + ${rest} til` : best.name;
+}
 
 const NEW = "__new__";
 
@@ -90,6 +98,7 @@ export function ReceiptList({ rows, projects }: { rows: ReceiptRow[]; projects: 
                   {formatDate(r.purchase_date)}
                   {r.category ? ` · ${r.category}` : ""}
                 </p>
+                {mainItem(r.items) && <p className="truncate text-sm">{mainItem(r.items)}</p>}
                 {r.note && <p className="truncate text-sm italic text-muted">{r.note}</p>}
                 {r.project_id && projectName.has(r.project_id) && (
                   <p className="mt-1">
