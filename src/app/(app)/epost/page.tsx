@@ -6,6 +6,7 @@ import { DEFAULT_QUERY, GmailAuthError, searchMessages, withExcludes, type Gmail
 import { CopyButton } from "./CopyButton";
 import { GmailResults } from "./GmailResults";
 import { GmailFilters } from "./GmailFilters";
+import { SearchInput } from "./SearchInput";
 import { gmailPeriodQuery, periods } from "@/lib/periods";
 
 export const metadata: Metadata = { title: "E-post – ReceiptMe" };
@@ -167,7 +168,7 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
           <>
             <form method="get" className="space-y-2">
               <div className="flex flex-col gap-2 sm:flex-row">
-                <input name="q" defaultValue={q} className="input flex-1" aria-label="Søk i Gmail" />
+                <SearchInput key={q} defaultValue={q} />
                 <select name="periode" defaultValue={periode} className="input sm:w-44" aria-label="Periode">
                   {periodOptions.map((p) => (
                     <option key={p.key} value={p.key}>{p.label}</option>
