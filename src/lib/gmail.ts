@@ -1,5 +1,6 @@
 import "server-only";
-import type { EmailAttachment, IncomingEmail } from "./email";
+import { htmlToText, type EmailAttachment, type IncomingEmail } from "./email";
+import { estimateTotal } from "./amount";
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -101,7 +102,25 @@ export type GmailHit = {
   date: string;
   snippet: string;
   hasAttachment: boolean;
+  /** Totalbeløp lest fra e-postteksten uten AI. Bare satt når prisfilteret er i bruk. null = ikke funnet. */
+  amount?: number | null;
 };
+
+/** Teksten i e-posten (HTML gjort om til tekst), for å finne beløpet før import. */
+function bodyText(part: Part | undefined): string {
+  let html = "";
+  let text = "";
+  const walk = (p: Part) => {
+    const type = (p.mimeType ?? "").toLowerCase();
+    if (!p.filename && p.body?.data) {
+      if (type === "text/html" && !html) html = decode(p.body.data).toString("utf8");
+      else if (type === "text/plain" && !text) text = decode(p.body.data).toString("utf8");
+    }
+    p.parts?.forEach(walk);
+  };
+  if (part) walk(part);
+  return html ? htmlToText(html) : text;
+}
 
 /** Legger lagrede unntak til søket, f.eks. «Bolt» blir -from:(Bolt). */
 export function withExcludes(q: string, excludes: string[]) {
@@ -115,7 +134,12 @@ export function withExcludes(q: string, excludes: string[]) {
 export type GmailPage = { hits: GmailHit[]; nextPageToken: string | null; estimate: number };
 
 /** Søker i Gmail med vanlig Gmail-søkesyntaks. Returnerer én side med de nyeste treffene. */
-export async function searchMessages(token: string, q: string, pageToken?: string, max = 50): Promise<GmailPage> {
+export async function searchMessages(
+  token: string,
+  q: string,
+  pageToken?: string,
+  { withAmount = false, max = 50 }: { withAmount?: boolean; max?: number } = {},
+): Promise<GmailPage> {
   const params = new URLSearchParams({ q, maxResults: String(max) });
   if (pageToken) params.set("pageToken", pageToken);
   const list = await api<{ messages?: { id: string }[]; nextPageToken?: string; resultSizeEstimate?: number }>(
@@ -123,8 +147,9 @@ export async function searchMessages(token: string, q: string, pageToken?: strin
     `/messages?${params}`,
   );
   const ids = (list.messages ?? []).map((m) => m.id);
-  const meta = new URLSearchParams({ format: "metadata" });
-  for (const h of ["From", "Subject", "Date"]) meta.append("metadataHeaders", h);
+  // Med prisfilter hentes hele e-posten (uten vedlegg) for å lese beløpet. Ellers bare avsender, emne og dato.
+  const meta = new URLSearchParams({ format: withAmount ? "full" : "metadata" });
+  if (!withAmount) for (const h of ["From", "Subject", "Date"]) meta.append("metadataHeaders", h);
 
   // Maks 10 samtidig, så vi holder oss under Gmail sin fartsgrense
   const messages: Message[] = [];
@@ -139,6 +164,7 @@ export async function searchMessages(token: string, q: string, pageToken?: strin
     date: m.internalDate ? new Date(Number(m.internalDate)).toISOString() : "",
     snippet: m.snippet ?? "",
     hasAttachment: (m.payload?.mimeType ?? "").startsWith("multipart/mixed"),
+    ...(withAmount ? { amount: estimateTotal(`${bodyText(m.payload)}\n${m.snippet ?? ""}`) } : {}),
   }));
   return { hits, nextPageToken: list.nextPageToken ?? null, estimate: list.resultSizeEstimate ?? hits.length };
 }

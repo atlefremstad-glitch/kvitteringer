@@ -114,6 +114,15 @@ export function GmailResults({
                   {sender(h.from)} · {dateText(h.date)}
                   {h.hasAttachment ? " · 📎" : ""}
                 </p>
+                {h.amount !== undefined && (
+                  <p className="text-sm font-medium tabular-nums">
+                    {h.amount === null ? (
+                      <span className="font-normal text-muted">Pris ikke funnet</span>
+                    ) : (
+                      `ca. ${h.amount.toLocaleString("nb-NO", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kr`
+                    )}
+                  </p>
+                )}
                 {st?.kind === "error" && <p className="text-sm text-red-600">{st.text}</p>}
                 {st?.kind === "skipped" && (
                   <p className="text-sm text-muted">
