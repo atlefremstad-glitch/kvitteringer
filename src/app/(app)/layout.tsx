@@ -11,6 +11,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             Kvitteringer
           </Link>
           <div className="flex items-center gap-2">
+            <Link href="/kart" className="btn px-3">
+              Kart
+            </Link>
             <Link href="/ny" className="btn-primary">
               + Ny
             </Link>

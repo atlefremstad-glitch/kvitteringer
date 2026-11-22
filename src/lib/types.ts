@@ -27,6 +27,9 @@ export type Receipt = {
   items: ReceiptItem[];
   confidence: number | null;
   note: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
   raw_ai: unknown;
   ai_error: string | null;
 };

@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import sharp from "sharp";
 import { CATEGORIES, isCategory, type Category } from "./categories";
+import type { AddressParts } from "./geocode";
 import type { ReceiptItem } from "./types";
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
@@ -23,6 +24,7 @@ const RECEIPT_SCHEMA = {
     "items",
     "category",
     "confidence",
+    "location",
   ],
   properties: {
     merchant: nullable({ type: "string", description: "Butikkens eller firmaets navn" }),
@@ -56,6 +58,19 @@ const RECEIPT_SCHEMA = {
       type: "number",
       description: "Hvor sikker du er på uttrekket totalt, fra 0 til 1",
     },
+    location: nullable({
+      type: "object",
+      description: "Adressen til butikken der kjøpet ble gjort. null hvis den ikke står på kvitteringen.",
+      additionalProperties: false,
+      required: ["address", "street", "postal_code", "city", "country"],
+      properties: {
+        address: { type: "string", description: "Hele adressen på én linje, f.eks. 'Storgata 1, 0155 Oslo'" },
+        street: nullable({ type: "string", description: "Gatenavn og husnummer, f.eks. 'Storgata 1'" }),
+        postal_code: nullable({ type: "string" }),
+        city: nullable({ type: "string", description: "Poststed/by" }),
+        country: nullable({ type: "string", description: "ISO 3166-1 alpha-2, f.eks. NO, SE, DK" }),
+      },
+    }),
   },
 } as const;
 
@@ -70,6 +85,7 @@ export type Extracted = {
   items: ReceiptItem[];
   category: Category;
   confidence: number | null;
+  location: AddressParts | null;
 };
 
 export type ExtractResult =
@@ -88,6 +104,8 @@ function systemPrompt() {
     `- Velg én kategori fra listen: ${CATEGORIES.join(", ")}.`,
     "- confidence: 1 = alt er tydelig lesbart, 0 = nesten ingenting kunne leses.",
     "- Hvis filen ikke er en kvittering, sett confidence lavt og felt til null.",
+    "- location: adressen til den fysiske butikken der kjøpet ble gjort, slik den står på kvitteringen.",
+    "  Ved netthandel, eller hvis bare hovedkontorets adresse står, sett location til null.",
   ].join("\n");
 }
 
@@ -115,6 +133,20 @@ function str(v: unknown): string | null {
   return typeof v === "string" && v.trim() !== "" ? v.trim() : null;
 }
 
+function cleanLocation(v: unknown): AddressParts | null {
+  if (typeof v !== "object" || v === null) return null;
+  const l = v as Record<string, unknown>;
+  const address = str(l.address);
+  if (!address) return null;
+  return {
+    address: address.slice(0, 300),
+    street: str(l.street),
+    postal_code: str(l.postal_code),
+    city: str(l.city),
+    country: str(l.country)?.toUpperCase().slice(0, 2) ?? null,
+  };
+}
+
 function clean(raw: Record<string, unknown>): Extracted {
   const date = str(raw.purchase_date);
   const org = str(raw.org_number)?.replace(/\D/g, "") || null;
@@ -134,6 +166,7 @@ function clean(raw: Record<string, unknown>): Extracted {
       .filter((i) => i.name !== ""),
     category: isCategory(raw.category) ? raw.category : "Annet",
     confidence,
+    location: cleanLocation(raw.location),
   };
 }
 

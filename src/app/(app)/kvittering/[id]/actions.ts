@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { isCategory } from "@/lib/categories";
 import { parseAmount, parseDate } from "@/lib/format";
-import { BUCKET, processReceipt } from "@/lib/process";
+import { geocode } from "@/lib/geocode";
+import { BUCKET, processReceipt, refreshLocation } from "@/lib/process";
 
 export type ReceiptInput = {
   merchant: string;
@@ -17,6 +18,7 @@ export type ReceiptInput = {
   payment_method: string;
   category: string;
   note: string;
+  address: string;
   items: { name: string; quantity: string; price: string }[];
 };
 
@@ -33,9 +35,30 @@ export async function updateReceipt(id: string, input: ReceiptInput) {
     return { ok: false as const, error: "Valuta må være tre bokstaver, f.eks. NOK." };
   }
 
+  // Ny eller endret adresse: finn koordinatene på nytt.
+  const address = text(input.address)?.slice(0, 300) ?? null;
+  const { data: current } = await supabase
+    .from("receipts")
+    .select("address, latitude, longitude")
+    .eq("id", id)
+    .single();
+  let location = {
+    address,
+    latitude: (current?.latitude ?? null) as number | null,
+    longitude: (current?.longitude ?? null) as number | null,
+  };
+  let warning: string | null = null;
+  const missingCoords = location.latitude === null || location.longitude === null;
+  if (address !== (current?.address ?? null) || (address && missingCoords)) {
+    const coords = await geocode({ address });
+    location = { address, latitude: coords?.latitude ?? null, longitude: coords?.longitude ?? null };
+    if (address && !coords) warning = "Lagret, men fant ikke adressen på kartet. Sjekk skrivemåten.";
+  }
+
   const { error } = await supabase
     .from("receipts")
     .update({
+      ...location,
       merchant: text(input.merchant),
       org_number: text(input.org_number)?.replace(/\D/g, "") || null,
       purchase_date: parseDate(input.purchase_date),
@@ -59,8 +82,17 @@ export async function updateReceipt(id: string, input: ReceiptInput) {
 
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/");
+  revalidatePath("/kart");
   revalidatePath(`/kvittering/${id}`);
-  return { ok: true as const };
+  return { ok: true as const, warning };
+}
+
+export async function findLocation(id: string) {
+  const { supabase } = await requireUser();
+  const result = await refreshLocation(supabase, id);
+  revalidatePath("/kart");
+  revalidatePath(`/kvittering/${id}`);
+  return result;
 }
 
 export async function deleteReceipt(id: string) {

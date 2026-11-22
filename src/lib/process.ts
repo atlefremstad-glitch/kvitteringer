@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import convert from "heic-convert";
 import { extractReceipt, prepareForClaude } from "./extract";
+import { geocode } from "./geocode";
 
 export const BUCKET = "receipts";
 
@@ -53,14 +54,67 @@ export async function processReceipt(supabase: SupabaseClient, userId: string, i
     const result = await extractReceipt(content);
     if (!result.ok) return fail(result.error, result.raw);
 
+    const { location, ...fields } = result.data;
+    const coords = location ? await geocode(location) : null;
+
     const { error: saveError } = await supabase
       .from("receipts")
-      .update({ ...result.data, status: "ok", ai_error: null, raw_ai: result.raw })
+      .update({
+        ...fields,
+        address: location?.address ?? null,
+        latitude: coords?.latitude ?? null,
+        longitude: coords?.longitude ?? null,
+        status: "ok",
+        ai_error: null,
+        raw_ai: result.raw,
+      })
       .eq("id", id);
     if (saveError) return fail("Kunne ikke lagre AI-resultatet.", result.raw);
 
     return { ok: true as const };
   } catch (err) {
     return fail(err instanceof Error ? `Behandling feilet: ${err.message}` : "Behandling feilet.");
+  }
+}
+
+/**
+ * Lar AI-en lese bare adressen på nytt (for kvitteringer lagt inn før kartet fantes).
+ * Andre felt brukeren kan ha rettet, røres ikke.
+ */
+export async function refreshLocation(supabase: SupabaseClient, id: string) {
+  const { data: receipt } = await supabase
+    .from("receipts")
+    .select("file_path, file_type")
+    .eq("id", id)
+    .single();
+  if (!receipt) return { ok: false as const, error: "Fant ikke kvitteringen." };
+  if (receipt.file_type === "image/heic" || receipt.file_type === "image/heif") {
+    return { ok: false as const, error: "Trykk «Prøv AI igjen» først, så bildet blir konvertert." };
+  }
+
+  const { data: blob } = await supabase.storage.from(BUCKET).download(receipt.file_path);
+  if (!blob) return { ok: false as const, error: "Kunne ikke lese filen fra lagringen." };
+
+  try {
+    const content = await prepareForClaude(Buffer.from(await blob.arrayBuffer()), receipt.file_type);
+    const result = await extractReceipt(content);
+    if (!result.ok) return { ok: false as const, error: result.error };
+    const location = result.data.location;
+    if (!location) return { ok: false as const, error: "Fant ingen butikkadresse på kvitteringen." };
+
+    const coords = await geocode(location);
+    const { error } = await supabase
+      .from("receipts")
+      .update({
+        address: location.address,
+        latitude: coords?.latitude ?? null,
+        longitude: coords?.longitude ?? null,
+      })
+      .eq("id", id);
+    if (error) return { ok: false as const, error: "Kunne ikke lagre adressen." };
+    if (!coords) return { ok: false as const, error: `Fant adressen «${location.address}», men ikke på kartet.` };
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: err instanceof Error ? err.message : "Noe gikk galt." };
   }
 }
