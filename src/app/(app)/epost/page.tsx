@@ -11,6 +11,10 @@ import { gmailPeriodQuery, periods } from "@/lib/periods";
 export const metadata: Metadata = { title: "E-post – ReceiptMe" };
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
+const toNumber = (v: string) => {
+  const t = v.replace(/\s/g, "").replace(",", ".");
+  return t !== "" && Number.isFinite(Number(t)) && Number(t) >= 0 ? Number(t) : null;
+};
 
 export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
   const params = await searchParams;
@@ -20,11 +24,19 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
   const periodOptions = periods();
   const periode = periodOptions.some((p) => p.key === one(params.periode)) ? one(params.periode) : "alltid";
   const periodQuery = gmailPeriodQuery(periodOptions.find((p) => p.key === periode));
+  // Prisfilter: «til» er valgfri. Beløpet leses fra e-postteksten før import.
+  const prisFra = toNumber(one(params.prisFra));
+  const prisTil = toNumber(one(params.prisTil));
+  const visUkjent = one(params.ukjent) === "1";
+  const priceActive = prisFra !== null || prisTil !== null;
   // Sidetokens fra Gmail, ett per side vi har bladd forbi, skilt med punktum
   const pages = one(params.side).split(".").filter((t) => /^[0-9A-Za-z_-]+$/.test(t)).slice(0, 50);
   const pageLink = (stack: string[]) => {
     const sp = new URLSearchParams({ q });
     if (periode !== "alltid") sp.set("periode", periode);
+    if (prisFra !== null) sp.set("prisFra", String(prisFra));
+    if (prisTil !== null) sp.set("prisTil", String(prisTil));
+    if (visUkjent) sp.set("ukjent", "1");
     if (stack.length) sp.set("side", stack.join("."));
     return `/epost?${sp}`;
   };
@@ -42,6 +54,8 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
   let hits: GmailHit[] = [];
   let nextPageToken: string | null = null;
   let estimate = 0;
+  let scanned = 0;
+  let unknownHidden = 0;
   let imported: Record<string, string> = {};
   let searchError: string | null = null;
   let gmailEmail = settings?.gmail_email ?? null;
@@ -50,8 +64,17 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
     try {
       const token = await gmailAccessToken(user.id);
       if (token) {
-        const page = await searchMessages(token, withExcludes(`${q} ${periodQuery}`.trim(), settings.gmail_excludes), pages.at(-1));
+        const page = await searchMessages(token, withExcludes(`${q} ${periodQuery}`.trim(), settings.gmail_excludes), pages.at(-1), { withAmount: priceActive });
+        scanned = page.hits.length;
         hits = page.hits;
+        if (priceActive) {
+          unknownHidden = visUkjent ? 0 : hits.filter((h) => h.amount == null).length;
+          hits = hits.filter((h) =>
+            h.amount == null
+              ? visUkjent
+              : (prisFra === null || h.amount >= prisFra) && (prisTil === null || h.amount <= prisTil),
+          );
+        }
         nextPageToken = page.nextPageToken;
         estimate = page.estimate;
       }
@@ -142,14 +165,30 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
           </>
         ) : (
           <>
-            <form method="get" className="flex flex-col gap-2 sm:flex-row">
-              <input name="q" defaultValue={q} className="input flex-1" aria-label="Søk i Gmail" />
-              <select name="periode" defaultValue={periode} className="input sm:w-44" aria-label="Periode">
-                {periodOptions.map((p) => (
-                  <option key={p.key} value={p.key}>{p.label}</option>
-                ))}
-              </select>
-              <button className="btn-primary" type="submit">Søk</button>
+            <form method="get" className="space-y-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input name="q" defaultValue={q} className="input flex-1" aria-label="Søk i Gmail" />
+                <select name="periode" defaultValue={periode} className="input sm:w-44" aria-label="Periode">
+                  {periodOptions.map((p) => (
+                    <option key={p.key} value={p.key}>{p.label}</option>
+                  ))}
+                </select>
+                <button className="btn-primary" type="submit">Søk</button>
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <div>
+                  <label className="label" htmlFor="prisFra">Pris fra (kr)</label>
+                  <input id="prisFra" name="prisFra" inputMode="decimal" defaultValue={one(params.prisFra)} className="input w-28" />
+                </div>
+                <div>
+                  <label className="label" htmlFor="prisTil">til (valgfri)</label>
+                  <input id="prisTil" name="prisTil" inputMode="decimal" defaultValue={one(params.prisTil)} className="input w-28" />
+                </div>
+                <label className="flex items-center gap-2 pb-2 text-sm text-muted">
+                  <input type="checkbox" name="ukjent" value="1" defaultChecked={visUkjent} />
+                  Vis også treff uten funnet pris
+                </label>
+              </div>
             </form>
             <p className="text-xs text-muted">
               Vanlig Gmail-søk virker, f.eks. <code>from:komplett.no</code>, <code>has:attachment</code> eller{" "}
@@ -165,12 +204,24 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
             {!searchError && q && (
               <>
                 <GmailResults
-                  key={`${q}|${periode}|${pages.join(".")}`}
+                  key={`${q}|${periode}|${prisFra}|${prisTil}|${visUkjent}|${pages.join(".")}`}
                   hits={hits}
                   imported={imported}
                   skipped={settings?.gmail_min_amount !== null ? (settings?.gmail_skipped ?? []) : []}
-                  pageLabel={`Side ${pages.length + 1}${estimate > hits.length ? ` · ca. ${estimate} treff` : ""}`}
+                  pageLabel={
+                    priceActive
+                      ? `Side ${pages.length + 1} · ${hits.length} av ${scanned} passer prisen`
+                      : `Side ${pages.length + 1}${estimate > hits.length ? ` · ca. ${estimate} treff` : ""}`
+                  }
                 />
+                {priceActive && (
+                  <p className="text-xs text-muted">
+                    Prisen leses fra teksten i e-posten og er et anslag. Kvitteringer som bare ligger som PDF-vedlegg
+                    har ingen pris i teksten
+                    {unknownHidden > 0 ? `, så ${unknownHidden} treff på denne siden er skjult` : ""}. Huk av for å
+                    se dem også.
+                  </p>
+                )}
                 {(pages.length > 0 || nextPageToken) && (
                   <nav className="flex items-center justify-between gap-2">
                     {pages.length > 0 ? (
