@@ -33,6 +33,8 @@ export type Receipt = {
   latitude: number | null;
   longitude: number | null;
   project_id: string | null;
+  exchange_rate: number | null;
+  nok_total: number | null;
   raw_ai: unknown;
   ai_error: string | null;
 };

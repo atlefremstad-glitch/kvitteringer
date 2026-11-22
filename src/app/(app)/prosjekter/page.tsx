@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { formatAmount, formatDate } from "@/lib/format";
-import { sumByCurrency } from "@/lib/sums";
+import { nokSum } from "@/lib/fx";
 
 export const metadata: Metadata = { title: "Prosjekter – ReceiptMe" };
 
@@ -10,14 +10,14 @@ type ProjectRow = {
   id: string;
   name: string;
   created_at: string;
-  receipts: { total: number | null; currency: string; purchase_date: string | null }[];
+  receipts: { total: number | null; nok_total: number | null; purchase_date: string | null }[];
 };
 
 export default async function ProjectsPage() {
   const { supabase } = await requireUser();
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, created_at, receipts(total, currency, purchase_date)")
+    .select("id, name, created_at, receipts(total, nok_total, purchase_date)")
     .order("created_at", { ascending: false });
   const projects = (data ?? []) as ProjectRow[];
 
@@ -42,7 +42,7 @@ export default async function ProjectsPage() {
       ) : (
         <ul className="card divide-y divide-border overflow-hidden">
           {projects.map((p) => {
-            const sums = sumByCurrency(p.receipts);
+            const { sum, missing } = nokSum(p.receipts);
             const dates = p.receipts.map((r) => r.purchase_date).filter((d): d is string => Boolean(d)).sort();
             return (
               <li key={p.id}>
@@ -57,7 +57,8 @@ export default async function ProjectsPage() {
                     </p>
                   </div>
                   <span className="shrink-0 text-right font-semibold tabular-nums">
-                    {sums.length === 0 ? formatAmount(0) : sums.map(([cur, t]) => formatAmount(t, cur)).join(" + ")}
+                    {formatAmount(sum)}
+                    {missing > 0 && <span className="block text-xs font-normal text-muted">+ {missing} uten kurs</span>}
                   </span>
                 </Link>
               </li>
