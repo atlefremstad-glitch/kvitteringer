@@ -22,6 +22,7 @@ function toInput(r: Receipt): ReceiptInput {
     payment_method: r.payment_method ?? "",
     category: r.category ?? "",
     note: r.note ?? "",
+    address: r.address ?? "",
     items: (r.items ?? []).map((i) => ({
       name: i.name ?? "",
       quantity: qtyText(i.quantity),
@@ -52,7 +53,13 @@ export function EditForm({ receipt }: { receipt: Receipt }) {
     setAction("save");
     startTransition(async () => {
       const res = await updateReceipt(receipt.id, form);
-      setMessage(res.ok ? { kind: "ok", text: "Lagret." } : { kind: "error", text: res.error });
+      setMessage(
+        !res.ok
+          ? { kind: "error", text: res.error }
+          : res.warning
+            ? { kind: "error", text: res.warning }
+            : { kind: "ok", text: "Lagret." },
+      );
       if (res.ok) router.refresh();
     });
   }
@@ -128,6 +135,10 @@ export function EditForm({ receipt }: { receipt: Receipt }) {
         <div className="col-span-2">
           <label className="label" htmlFor="org">Organisasjonsnummer</label>
           <input id="org" className="input" inputMode="numeric" value={form.org_number} onChange={(e) => set("org_number", e.target.value)} />
+        </div>
+        <div className="col-span-2">
+          <label className="label" htmlFor="address">Adresse (kjøpssted)</label>
+          <input id="address" className="input" placeholder="F.eks. Storgata 1, 0155 Oslo" maxLength={300} value={form.address} onChange={(e) => set("address", e.target.value)} />
         </div>
       </div>
 
