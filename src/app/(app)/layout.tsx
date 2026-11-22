@@ -8,7 +8,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <header className="sticky top-0 z-10 border-b border-border bg-surface/90 backdrop-blur pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <Link href="/" className="text-lg font-semibold">
-            Kvitteringer
+            ReceiptMe
           </Link>
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             <Link href="/epost" className="btn px-3">

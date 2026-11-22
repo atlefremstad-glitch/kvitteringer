@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { EditForm } from "./EditForm";
 import { LocationCard } from "./LocationCard";
 
-export const metadata: Metadata = { title: "Kvittering – Kvitteringer" };
+export const metadata: Metadata = { title: "Kvittering – ReceiptMe" };
 export const maxDuration = 60;
 
 export default async function ReceiptPage({ params }: PageProps<"/kvittering/[id]">) {

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireUser } from "@/lib/supabase/server";
 import { Uploader } from "./Uploader";
 
-export const metadata: Metadata = { title: "Ny kvittering – Kvitteringer" };
+export const metadata: Metadata = { title: "Ny kvittering – ReceiptMe" };
 
 export default async function NewReceiptPage() {
   const { user } = await requireUser();
