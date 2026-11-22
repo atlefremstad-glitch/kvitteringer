@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -11,6 +11,16 @@ export function LoginForm() {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Appen lagt til på hjem-skjermen (iPhone) har egen lagring, så lenken
+  // i e-posten logger bare inn Safari. Der må koden brukes.
+  const [standalone, setStandalone] = useState(false);
+
+  useEffect(() => {
+    const nav = window.navigator as Navigator & { standalone?: boolean };
+    setStandalone(
+      nav.standalone === true || window.matchMedia("(display-mode: standalone)").matches,
+    );
+  }, []);
 
   async function sendLink(e: React.FormEvent) {
     e.preventDefault();
@@ -49,11 +59,21 @@ export function LoginForm() {
     return (
       <div className="space-y-4">
         <p className="rounded-lg bg-green-50 p-3 text-sm text-green-900 dark:bg-green-950 dark:text-green-100">
-          Sjekk e-posten til <strong>{email}</strong> og trykk på lenken. Åpne den i samme nettleser.
+          {standalone ? (
+            <>
+              Sjekk e-posten til <strong>{email}</strong> og skriv inn koden under. Ikke trykk
+              på lenken, den åpner Safari i stedet for appen.
+            </>
+          ) : (
+            <>
+              Sjekk e-posten til <strong>{email}</strong> og trykk på lenken, eller skriv inn
+              koden under.
+            </>
+          )}
         </p>
         <form onSubmit={verifyCode} className="space-y-2">
           <label className="block text-sm font-medium" htmlFor="code">
-            Eller skriv inn koden fra e-posten
+            Kode fra e-posten
           </label>
           <input
             id="code"
@@ -61,7 +81,8 @@ export function LoginForm() {
             autoComplete="one-time-code"
             className="input"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            maxLength={10}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             placeholder="123456"
           />
           <button className="btn-primary w-full" disabled={busy || code.trim().length < 6}>
@@ -92,7 +113,7 @@ export function LoginForm() {
         placeholder="deg@eksempel.no"
       />
       <button className="btn-primary w-full" disabled={busy}>
-        {busy ? "Sender…" : "Send innloggingslenke"}
+        {busy ? "Sender…" : "Send innloggingskode"}
       </button>
       {error && <p className="text-sm text-red-600">{error}</p>}
     </form>
