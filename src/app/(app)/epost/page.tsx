@@ -70,7 +70,7 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
     try {
       const token = await gmailAccessToken(user.id);
       if (token) {
-        const page = await searchMessages(token, withExcludes(`${q} ${periodQuery} ${medVedlegg ? "has:attachment" : ""}`.trim(), settings.gmail_excludes), pages.at(-1), { withAmount: priceActive });
+        const page = await searchMessages(token, withExcludes(`${q} ${periodQuery} ${medVedlegg ? "has:attachment" : ""}`.trim(), settings.gmail_excludes), pages.at(-1), { withAmount: true });
         scanned = page.hits.length;
         hits = page.hits;
         if (priceActive) {
