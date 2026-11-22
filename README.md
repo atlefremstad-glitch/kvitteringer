@@ -49,6 +49,7 @@ Gå til **Project Settings** → **API Keys** (eller trykk **Connect** øverst):
    | `NEXT_PUBLIC_SUPABASE_URL` | Project URL fra steg 2 |
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key fra steg 2 |
    | `ANTHROPIC_API_KEY` | API-nøkkelen fra [console.anthropic.com](https://console.anthropic.com) → API Keys |
+   | `ANTHROPIC_MODEL` | Valgfri. Standard `claude-haiku-5-5`. Sett `claude-sonnet-5-5` for bedre lesing av vanskelige kvitteringer. |
 
 3. Trykk **Deploy**. Når den er ferdig, kopier adressen (f.eks. `https://kvitteringer-abc.vercel.app`).
 
@@ -143,7 +144,7 @@ npm run dev                  # åpne http://localhost:3000
 
 - `src/app/(app)/` – sidene du ser når du er innlogget (liste, ny, detalj)
 - `src/app/api/receipts/process/route.ts` – kjører AI-uttrekket på serveren
-- `src/lib/extract.ts` – kallet til Claude (structured outputs med JSON-skjema), modell `claude-sonnet-5-5`
+- `src/lib/extract.ts` – kallet til Claude (structured outputs med JSON-skjema), modell fra `ANTHROPIC_MODEL` (standard `claude-haiku-5-5`)
 - `src/lib/process.ts` – henter filen fra Storage, konverterer HEIC til JPEG, lagrer resultatet
 - `src/proxy.ts` – fornyer innloggingen og sender ikke-innloggede til `/login`
 - `supabase/migrations/` – databaseskjema, RLS og Storage-regler

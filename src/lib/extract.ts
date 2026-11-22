@@ -5,7 +5,13 @@ import { CATEGORIES, isCategory, type Category } from "./categories";
 import type { AddressParts } from "./geocode";
 import type { ReceiptItem } from "./types";
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
+/** Modellen styres med ANTHROPIC_MODEL i Vercel. Standard er Haiku (billigst). Bytt til claude-sonnet-5-5 for bedre lesing av uskarpe/håndskrevne kvitteringer. */
+const MODEL = process.env.ANTHROPIC_MODEL?.trim() || "claude-haiku-5-5";
+
+/** Haiku har ingen server-side fallback ved avslag, så parameteren sendes bare til andre modeller. */
+const FALLBACK = MODEL.startsWith("claude-haiku")
+  ? {}
+  : { betas: ["server-side-fallback-2026-07-01"] as Anthropic.Beta.AnthropicBeta[], fallbacks: "default" as const };
 
 const nullable = (schema: Record<string, unknown>) => ({ anyOf: [schema, { type: "null" }] });
 
@@ -196,9 +202,8 @@ export async function extractReceipt(file: FileContent, context?: string): Promi
     const response = await client.beta.messages.create({
       model: MODEL,
       max_tokens: 16000,
-      // Hvis modellen avslår, prøver API-et automatisk en annen modell.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
+      // Hvis modellen avslår, prøver API-et automatisk en annen modell (ikke for Haiku).
+      ...FALLBACK,
       output_config: {
         effort: "medium",
         format: { type: "json_schema", schema: RECEIPT_SCHEMA as unknown as Record<string, unknown> },
