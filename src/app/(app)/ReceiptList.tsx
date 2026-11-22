@@ -8,6 +8,7 @@ import type { Receipt } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { groupIntoProject } from "./prosjekter/actions";
 import { deleteReceipts } from "./actions";
+import { useHoverPreview } from "./HoverPreview";
 
 export type ReceiptRow = Pick<
   Receipt,
@@ -32,6 +33,7 @@ export function ReceiptList({ rows, projects }: { rows: ReceiptRow[]; projects: 
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const preview = useHoverPreview();
 
   const projectName = new Map(projects.map((p) => [p.id, p.name]));
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
@@ -105,7 +107,7 @@ export function ReceiptList({ rows, projects }: { rows: ReceiptRow[]; projects: 
                 aria-label={`Velg ${r.merchant ?? "kvittering"}`}
               />
             </label>
-            <Link href={`/kvittering/${r.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-2 pr-4 hover:bg-background">
+            <Link href={`/kvittering/${r.id}`} {...preview.handlers(r.id)} onClick={preview.hide} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-2 pr-4 hover:bg-background">
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{r.merchant ?? "Ukjent butikk"}</p>
                 <p className="truncate text-sm text-muted">
@@ -130,6 +132,7 @@ export function ReceiptList({ rows, projects }: { rows: ReceiptRow[]; projects: 
           </li>
         ))}
       </ul>
+      {preview.panel}
 
       {selected.size > 0 && (
         <div className="sticky bottom-0 z-10 pb-[env(safe-area-inset-bottom)]">
