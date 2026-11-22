@@ -8,9 +8,14 @@ export const metadata: Metadata = {
   title: "ReceiptMe",
   description: "Skann og hold oversikt over kvitteringer",
   appleWebApp: { capable: true, title: "ReceiptMe", statusBarStyle: "default" },
+  // ?v=2 tvinger nettlesere og telefoner til å hente ikonene på nytt
   icons: {
-    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+    icon: [
+      { url: "/favicon.ico?v=2", sizes: "16x16 32x32 48x48" },
+      { url: "/icons/icon-192.png?v=2", sizes: "192x192", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico?v=2",
+    apple: [{ url: "/apple-touch-icon.png?v=2", sizes: "180x180", type: "image/png" }],
   },
 };
 

@@ -107,9 +107,12 @@ export function ReceiptList({ rows, projects }: { rows: ReceiptRow[]; projects: 
                 aria-label={`Velg ${r.merchant ?? "kvittering"}`}
               />
             </label>
-            <Link href={`/kvittering/${r.id}`} {...preview.handlers(r.id)} onClick={preview.hide} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-2 pr-4 hover:bg-background">
+            <Link href={`/kvittering/${r.id}`} onClick={preview.hide} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-2 pr-4 hover:bg-background">
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{r.merchant ?? "Ukjent butikk"}</p>
+                <p className="truncate font-medium">
+                  {/* Stort bilde vises bare når musen er over navnet */}
+                  <span {...preview.handlers(r.id)}>{r.merchant ?? "Ukjent butikk"}</span>
+                </p>
                 <p className="truncate text-sm text-muted">
                   {formatDate(r.purchase_date)}
                   {r.category ? ` · ${r.category}` : ""}
