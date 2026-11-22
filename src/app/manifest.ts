@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Kvitteringer",
-    short_name: "Kvitteringer",
+    name: "ReceiptMe",
+    short_name: "ReceiptMe",
     description: "Skann og hold oversikt over kvitteringer",
     lang: "nb",
     start_url: "/",

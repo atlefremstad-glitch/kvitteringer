@@ -6,7 +6,7 @@ import type { Receipt } from "@/lib/types";
 import { ReceiptMap, type MapPoint } from "@/components/ReceiptMap";
 
 
-export const metadata: Metadata = { title: "Kart – Kvitteringer" };
+export const metadata: Metadata = { title: "Kart – ReceiptMe" };
 
 type Row = Pick<Receipt, "id" | "merchant" | "purchase_date" | "total" | "currency" | "address" | "latitude" | "longitude">;
 

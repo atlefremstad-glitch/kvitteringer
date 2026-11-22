@@ -1,4 +1,4 @@
-# Kvitteringer
+# ReceiptMe
 
 Web-app (PWA) for å skanne og holde oversikt over kvitteringer.
 Next.js + Supabase (innlogging, database, fillagring) + Claude (leser kvitteringene).

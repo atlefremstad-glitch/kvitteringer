@@ -5,7 +5,7 @@ import { DEFAULT_QUERY, GmailAuthError, searchMessages, type GmailHit } from "@/
 import { CopyButton } from "./CopyButton";
 import { GmailResults } from "./GmailResults";
 
-export const metadata: Metadata = { title: "E-post – Kvitteringer" };
+export const metadata: Metadata = { title: "E-post – ReceiptMe" };
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
@@ -76,7 +76,7 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
               <CopyButton text={address} />
             </div>
             <p className="text-sm text-muted">
-              Tips: Lagre den som kontakt «Kvitteringer» i telefonen, så er den rask å velge.
+              Tips: Lagre den som kontakt «ReceiptMe» i telefonen, så er den rask å velge.
             </p>
           </>
         ) : (

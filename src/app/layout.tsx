@@ -5,9 +5,9 @@ import "./globals.css";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Kvitteringer",
+  title: "ReceiptMe",
   description: "Skann og hold oversikt over kvitteringer",
-  appleWebApp: { capable: true, title: "Kvitteringer", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "ReceiptMe", statusBarStyle: "default" },
   icons: {
     icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
