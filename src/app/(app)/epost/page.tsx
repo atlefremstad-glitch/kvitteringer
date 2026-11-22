@@ -29,6 +29,10 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
   const prisFra = toNumber(one(params.prisFra));
   const prisTil = toNumber(one(params.prisTil));
   const visUkjent = one(params.ukjent) === "1";
+  // «Med vedlegg» er på som standard. Skjemaet sender vedlegg=0 og, hvis avhuket, vedlegg=1 etterpå.
+  const vedleggParam = params.vedlegg;
+  const medVedlegg =
+    vedleggParam === undefined ? true : (Array.isArray(vedleggParam) ? vedleggParam.at(-1) : vedleggParam) === "1";
   const priceActive = prisFra !== null || prisTil !== null;
   // Sidetokens fra Gmail, ett per side vi har bladd forbi, skilt med punktum
   const pages = one(params.side).split(".").filter((t) => /^[0-9A-Za-z_-]+$/.test(t)).slice(0, 50);
@@ -38,6 +42,7 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
     if (prisFra !== null) sp.set("prisFra", String(prisFra));
     if (prisTil !== null) sp.set("prisTil", String(prisTil));
     if (visUkjent) sp.set("ukjent", "1");
+    sp.set("vedlegg", medVedlegg ? "1" : "0");
     if (stack.length) sp.set("side", stack.join("."));
     return `/epost?${sp}`;
   };
@@ -65,7 +70,7 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
     try {
       const token = await gmailAccessToken(user.id);
       if (token) {
-        const page = await searchMessages(token, withExcludes(`${q} ${periodQuery}`.trim(), settings.gmail_excludes), pages.at(-1), { withAmount: priceActive });
+        const page = await searchMessages(token, withExcludes(`${q} ${periodQuery} ${medVedlegg ? "has:attachment" : ""}`.trim(), settings.gmail_excludes), pages.at(-1), { withAmount: priceActive });
         scanned = page.hits.length;
         hits = page.hits;
         if (priceActive) {
@@ -186,6 +191,11 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
                   <input id="prisTil" name="prisTil" inputMode="decimal" defaultValue={one(params.prisTil)} className="input w-28" />
                 </div>
                 <label className="flex items-center gap-2 pb-2 text-sm text-muted">
+                  <input type="hidden" name="vedlegg" value="0" />
+                  <input type="checkbox" name="vedlegg" value="1" defaultChecked={medVedlegg} />
+                  Med vedlegg
+                </label>
+                <label className="flex items-center gap-2 pb-2 text-sm text-muted">
                   <input type="checkbox" name="ukjent" value="1" defaultChecked={visUkjent} />
                   Vis også treff uten funnet pris
                 </label>
@@ -205,7 +215,7 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
             {!searchError && q && (
               <>
                 <GmailResults
-                  key={`${q}|${periode}|${prisFra}|${prisTil}|${visUkjent}|${pages.join(".")}`}
+                  key={`${q}|${periode}|${prisFra}|${prisTil}|${visUkjent}|${medVedlegg}|${pages.join(".")}`}
                   hits={hits}
                   imported={imported}
                   skipped={settings?.gmail_min_amount !== null ? (settings?.gmail_skipped ?? []) : []}
