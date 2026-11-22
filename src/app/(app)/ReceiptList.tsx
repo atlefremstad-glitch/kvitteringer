@@ -7,6 +7,7 @@ import { formatAmount, formatDate } from "@/lib/format";
 import type { Receipt } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { groupIntoProject } from "./prosjekter/actions";
+import { deleteReceipts } from "./actions";
 
 export type ReceiptRow = Pick<
   Receipt,
@@ -26,7 +27,7 @@ const NEW = "__new__";
 export function ReceiptList({ rows, projects }: { rows: ReceiptRow[]; projects: { id: string; name: string }[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"idle" | "group" | "delete">("idle");
   const [target, setTarget] = useState<string>(NEW);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +51,7 @@ export function ReceiptList({ rows, projects }: { rows: ReceiptRow[]; projects: 
 
   function clear() {
     setSelected(new Set());
-    setOpen(false);
+    setMode("idle");
     setError(null);
   }
 
@@ -67,6 +68,19 @@ export function ReceiptList({ rows, projects }: { rows: ReceiptRow[]; projects: 
         return;
       }
       router.push(`/prosjekter/${result.projectId}`);
+    });
+  }
+
+  function confirmDelete() {
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteReceipts([...selected]);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      clear();
+      router.refresh();
     });
   }
 
@@ -120,13 +134,29 @@ export function ReceiptList({ rows, projects }: { rows: ReceiptRow[]; projects: 
       {selected.size > 0 && (
         <div className="sticky bottom-0 z-10 pb-[env(safe-area-inset-bottom)]">
           <div className="card space-y-3 p-3 shadow-lg">
-            {!open ? (
+            {mode === "idle" ? (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm">{selected.size} valgt</span>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
                   <button type="button" className="btn" onClick={clear}>Avbryt</button>
-                  <button type="button" className="btn-primary" onClick={() => setOpen(true)}>
+                  <button type="button" className="btn-danger" onClick={() => setMode("delete")}>
+                    Slett
+                  </button>
+                  <button type="button" className="btn-primary" onClick={() => setMode("group")}>
                     Samle til 1 prosjekt
+                  </button>
+                </div>
+              </div>
+            ) : mode === "delete" ? (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">
+                  Slette {selected.size} {selected.size === 1 ? "kvittering" : "kvitteringer"} for godt? Bildene og filene slettes også. Dette kan ikke angres.
+                </p>
+                {error && <p className="text-sm text-red-600">{error}</p>}
+                <div className="flex justify-end gap-2">
+                  <button type="button" className="btn" onClick={() => setMode("idle")} disabled={pending}>Nei, tilbake</button>
+                  <button type="button" className="btn-danger" onClick={confirmDelete} disabled={pending}>
+                    {pending ? "Sletter …" : `Ja, slett ${selected.size}`}
                   </button>
                 </div>
               </div>
@@ -153,7 +183,7 @@ export function ReceiptList({ rows, projects }: { rows: ReceiptRow[]; projects: 
                 )}
                 {error && <p className="text-sm text-red-600">{error}</p>}
                 <div className="flex justify-end gap-2">
-                  <button type="button" className="btn" onClick={() => setOpen(false)} disabled={pending}>Tilbake</button>
+                  <button type="button" className="btn" onClick={() => setMode("idle")} disabled={pending}>Tilbake</button>
                   <button type="submit" className="btn-primary" disabled={pending || (target === NEW && !name.trim())}>
                     {pending ? "Lagrer …" : "Lagre"}
                   </button>
