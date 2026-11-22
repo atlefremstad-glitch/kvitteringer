@@ -114,6 +114,7 @@ export function GmailResults({
                   {sender(h.from)} · {dateText(h.date)}
                   {h.hasAttachment ? " · 📎" : ""}
                 </p>
+                {h.item && <p className="truncate text-sm">{h.item}</p>}
                 {h.amount !== undefined && (
                   <p className="text-sm font-medium tabular-nums">
                     {h.amount === null ? (

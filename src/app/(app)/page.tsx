@@ -32,7 +32,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
 
   let query = supabase
     .from("receipts")
-    .select("id, merchant, purchase_date, total, currency, category, status, created_at, note, project_id")
+    .select("id, merchant, purchase_date, total, currency, category, status, created_at, note, project_id, items")
     .order("purchase_date", { ascending: false, nullsFirst: true })
     .order("created_at", { ascending: false })
     .limit(1000);

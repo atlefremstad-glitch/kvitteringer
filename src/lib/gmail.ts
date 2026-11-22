@@ -1,6 +1,6 @@
 import "server-only";
 import { htmlToText, type EmailAttachment, type IncomingEmail } from "./email";
-import { estimateTotal } from "./amount";
+import { estimateMainItem, estimateTotal } from "./amount";
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -104,7 +104,13 @@ export type GmailHit = {
   hasAttachment: boolean;
   /** Totalbeløp lest fra e-postteksten uten AI. Bare satt når prisfilteret er i bruk. null = ikke funnet. */
   amount?: number | null;
+  /** Gjettet hovedprodukt fra e-postteksten (varelinjen med høyest pris). null = ikke funnet. */
+  item?: string | null;
 };
+
+function estimates(body: string, snippet: string) {
+  return { amount: estimateTotal(`${body}\n${snippet}`), item: estimateMainItem(body) };
+}
 
 /** Teksten i e-posten (HTML gjort om til tekst), for å finne beløpet før import. */
 function bodyText(part: Part | undefined): string {
@@ -164,7 +170,7 @@ export async function searchMessages(
     date: m.internalDate ? new Date(Number(m.internalDate)).toISOString() : "",
     snippet: m.snippet ?? "",
     hasAttachment: (m.payload?.mimeType ?? "").startsWith("multipart/mixed"),
-    ...(withAmount ? { amount: estimateTotal(`${bodyText(m.payload)}\n${m.snippet ?? ""}`) } : {}),
+    ...(withAmount ? estimates(bodyText(m.payload), m.snippet ?? "") : {}),
   }));
   return { hits, nextPageToken: list.nextPageToken ?? null, estimate: list.resultSizeEstimate ?? hits.length };
 }
