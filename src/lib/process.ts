@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import convert from "heic-convert";
 import { extractReceipt, prepareForClaude } from "./extract";
 import { geocode } from "./geocode";
+import { nokFields } from "./fx";
 
 export const BUCKET = "receipts";
 
@@ -55,12 +56,16 @@ export async function processReceipt(supabase: SupabaseClient, userId: string, i
     if (!result.ok) return fail(result.error, result.raw);
 
     const { location, ...fields } = result.data;
-    const coords = location ? await geocode(location) : null;
+    const [coords, nok] = await Promise.all([
+      location ? geocode(location) : null,
+      nokFields(fields.total, fields.currency, fields.purchase_date),
+    ]);
 
     const { error: saveError } = await supabase
       .from("receipts")
       .update({
         ...fields,
+        ...nok,
         address: location?.address ?? null,
         latitude: coords?.latitude ?? null,
         longitude: coords?.longitude ?? null,

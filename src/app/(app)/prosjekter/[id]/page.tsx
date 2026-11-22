@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
 import { formatAmount, formatDate } from "@/lib/format";
-import { sumByCurrency } from "@/lib/sums";
+import { fillMissingNok, nokSum } from "@/lib/fx";
 import type { Receipt } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ProjectHeader } from "./ProjectHeader";
@@ -11,7 +11,7 @@ import { RemoveButton } from "./RemoveButton";
 
 export const metadata: Metadata = { title: "Prosjekt – ReceiptMe" };
 
-type Row = Pick<Receipt, "id" | "merchant" | "purchase_date" | "total" | "currency" | "category" | "status" | "note">;
+type Row = Pick<Receipt, "id" | "merchant" | "purchase_date" | "total" | "currency" | "category" | "status" | "note" | "nok_total" | "exchange_rate">;
 
 export default async function ProjectPage({ params }: PageProps<"/prosjekter/[id]">) {
   const { id } = await params;
@@ -22,21 +22,22 @@ export default async function ProjectPage({ params }: PageProps<"/prosjekter/[id
     supabase.from("projects").select("id, name").eq("id", id).maybeSingle(),
     supabase
       .from("receipts")
-      .select("id, merchant, purchase_date, total, currency, category, status, note")
+      .select("id, merchant, purchase_date, total, currency, category, status, note, nok_total, exchange_rate")
       .eq("project_id", id)
       .order("purchase_date", { ascending: false, nullsFirst: true })
       .order("created_at", { ascending: false }),
   ]);
   if (!project) notFound();
-  const rows = (data ?? []) as Row[];
-  const sums = sumByCurrency(rows);
+  // Eldre kvitteringer uten NOK-beløp får det regnet ut og lagret nå
+  const rows = await fillMissingNok(supabase, (data ?? []) as Row[]);
+  const { sum, missing } = nokSum(rows);
 
-  // Sum per kategori (bare NOK, for enkelhets skyld)
+  // Sum per kategori i NOK
   const byCategory = new Map<string, number>();
   for (const r of rows) {
-    if (r.total === null || r.currency !== "NOK") continue;
+    if (r.nok_total === null) continue;
     const key = r.category ?? "Uten kategori";
-    byCategory.set(key, (byCategory.get(key) ?? 0) + Number(r.total));
+    byCategory.set(key, (byCategory.get(key) ?? 0) + Number(r.nok_total));
   }
   const categories = [...byCategory.entries()].sort(([, a], [, b]) => b - a);
 
@@ -51,10 +52,13 @@ export default async function ProjectPage({ params }: PageProps<"/prosjekter/[id
           <p className="text-sm text-muted">
             {rows.length} {rows.length === 1 ? "kvittering" : "kvitteringer"}
           </p>
-          <p className="text-right text-2xl font-semibold tabular-nums">
-            {sums.length === 0 ? formatAmount(0) : sums.map(([cur, t]) => formatAmount(t, cur)).join(" + ")}
-          </p>
+          <p className="text-right text-2xl font-semibold tabular-nums">Totalt {formatAmount(sum)}</p>
         </div>
+        {missing > 0 && (
+          <p className="text-sm text-amber-700">
+            {missing} {missing === 1 ? "kvittering" : "kvitteringer"} i annen valuta er ikke med, fordi valutakursen ikke kunne hentes. Last siden på nytt for å prøve igjen.
+          </p>
+        )}
         {categories.length > 1 && (
           <ul className="space-y-1 border-t border-border pt-3 text-sm">
             {categories.map(([cat, total]) => (
@@ -88,6 +92,14 @@ export default async function ProjectPage({ params }: PageProps<"/prosjekter/[id
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <span className="font-semibold tabular-nums">{formatAmount(r.total, r.currency)}</span>
+                  {r.currency !== "NOK" && r.nok_total !== null && (
+                    <span
+                      className="text-xs text-muted tabular-nums"
+                      title={r.exchange_rate ? `Kurs ${String(r.exchange_rate).replace(".", ",")} (Norges Bank)` : undefined}
+                    >
+                      ≈ {formatAmount(r.nok_total)}
+                    </span>
+                  )}
                   {r.status !== "ok" && <StatusBadge status={r.status} />}
                 </div>
               </Link>

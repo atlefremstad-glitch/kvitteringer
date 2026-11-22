@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { isCategory } from "@/lib/categories";
 import { parseAmount, parseDate } from "@/lib/format";
 import { geocode } from "@/lib/geocode";
+import { nokFields } from "@/lib/fx";
 import { BUCKET, processReceipt, refreshLocation } from "@/lib/process";
 
 export type ReceiptInput = {
@@ -55,14 +56,19 @@ export async function updateReceipt(id: string, input: ReceiptInput) {
     if (address && !coords) warning = "Lagret, men fant ikke adressen på kartet. Sjekk skrivemåten.";
   }
 
+  const total = parseAmount(input.total);
+  const purchaseDate = parseDate(input.purchase_date);
+  const nok = await nokFields(total, currency, purchaseDate);
+
   const { error } = await supabase
     .from("receipts")
     .update({
       ...location,
+      ...nok,
       merchant: text(input.merchant),
       org_number: text(input.org_number)?.replace(/\D/g, "") || null,
-      purchase_date: parseDate(input.purchase_date),
-      total: parseAmount(input.total),
+      purchase_date: purchaseDate,
+      total,
       currency,
       vat: parseAmount(input.vat),
       payment_method: text(input.payment_method),
@@ -83,6 +89,7 @@ export async function updateReceipt(id: string, input: ReceiptInput) {
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/");
   revalidatePath("/kart");
+  revalidatePath("/prosjekter", "layout");
   revalidatePath(`/kvittering/${id}`);
   return { ok: true as const, warning };
 }

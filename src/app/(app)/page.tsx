@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { CATEGORIES } from "@/lib/categories";
-import { formatAmount } from "@/lib/format";
 import { periods } from "@/lib/periods";
-import { sumByCurrency } from "@/lib/sums";
 import { ReceiptList, type ReceiptRow } from "./ReceiptList";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
@@ -52,8 +50,6 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
   const rows = (data ?? []) as ReceiptRow[];
   const projects = (projectData ?? []) as { id: string; name: string }[];
 
-  // Sum per valuta for det som er filtrert
-  const sumEntries = sumByCurrency(rows);
   const filtered = Boolean(q || kategori || fra || til || over !== null);
 
   return (
@@ -107,12 +103,6 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
         <p className="text-sm text-muted">
           {rows.length} {rows.length === 1 ? "kvittering" : "kvitteringer"}
           {filtered ? " (filtrert)" : ""}
-        </p>
-        <p className="text-right text-lg font-semibold">
-          Sum:{" "}
-          {sumEntries.length === 0
-            ? formatAmount(0)
-            : sumEntries.map(([cur, total]) => formatAmount(total, cur)).join(" + ")}
         </p>
       </div>
 
