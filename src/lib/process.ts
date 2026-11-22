@@ -10,7 +10,7 @@ export const BUCKET = "receipts";
  * Leser filen fra Storage, sender den til Claude og lagrer resultatet.
  * Feiler AI-uttrekket, lagres kvitteringen med status "needs_review".
  */
-export async function processReceipt(supabase: SupabaseClient, userId: string, id: string) {
+export async function processReceipt(supabase: SupabaseClient, userId: string, id: string, context?: string) {
   const { data: receipt, error } = await supabase
     .from("receipts")
     .select("id, file_path, file_type")
@@ -51,7 +51,7 @@ export async function processReceipt(supabase: SupabaseClient, userId: string, i
     }
 
     const content = await prepareForClaude(buffer, fileType);
-    const result = await extractReceipt(content);
+    const result = await extractReceipt(content, context);
     if (!result.ok) return fail(result.error, result.raw);
 
     const { location, ...fields } = result.data;

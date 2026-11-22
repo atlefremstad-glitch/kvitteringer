@@ -27,6 +27,8 @@ export type Receipt = {
   items: ReceiptItem[];
   confidence: number | null;
   note: string | null;
+  source: "upload" | "gmail" | "email";
+  source_ref: string | null;
   address: string | null;
   latitude: number | null;
   longitude: number | null;

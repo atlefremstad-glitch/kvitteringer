@@ -10,7 +10,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <Link href="/" className="text-lg font-semibold">
             Kvitteringer
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <Link href="/epost" className="btn px-3">
+              E-post
+            </Link>
             <Link href="/kart" className="btn px-3">
               Kart
             </Link>
@@ -18,7 +21,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               + Ny
             </Link>
             <form action="/auth/signout" method="post">
-              <button className="btn" type="submit">
+              <button className="btn px-3" type="submit">
                 Logg ut
               </button>
             </form>
