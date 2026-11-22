@@ -16,6 +16,7 @@ export type ReceiptInput = {
   vat: string;
   payment_method: string;
   category: string;
+  note: string;
   items: { name: string; quantity: string; price: string }[];
 };
 
@@ -43,6 +44,7 @@ export async function updateReceipt(id: string, input: ReceiptInput) {
       vat: parseAmount(input.vat),
       payment_method: text(input.payment_method),
       category: isCategory(input.category) ? input.category : null,
+      note: input.note.trim() === "" ? null : input.note.trim().slice(0, 2000),
       items: input.items
         .filter((i) => i.name.trim() !== "")
         .map((i) => ({

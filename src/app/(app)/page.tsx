@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 
 type Row = Pick<
   Receipt,
-  "id" | "merchant" | "purchase_date" | "total" | "currency" | "category" | "status" | "created_at"
+  "id" | "merchant" | "purchase_date" | "total" | "currency" | "category" | "status" | "created_at" | "note"
 >;
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
@@ -24,7 +24,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
 
   let query = supabase
     .from("receipts")
-    .select("id, merchant, purchase_date, total, currency, category, status, created_at")
+    .select("id, merchant, purchase_date, total, currency, category, status, created_at, note")
     .order("purchase_date", { ascending: false, nullsFirst: true })
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -109,6 +109,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
                     {formatDate(r.purchase_date)}
                     {r.category ? ` · ${r.category}` : ""}
                   </p>
+                  {r.note && <p className="truncate text-sm italic text-muted">{r.note}</p>}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <span className="font-semibold tabular-nums">{formatAmount(r.total, r.currency)}</span>
