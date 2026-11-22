@@ -15,6 +15,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <Link href="/epost" className="btn px-3">
               E-post
             </Link>
+            <Link href="/prosjekter" className="btn px-3">
+              Prosjekter
+            </Link>
             <Link href="/kart" className="btn px-3">
               Kart
             </Link>
