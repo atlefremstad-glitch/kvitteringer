@@ -6,6 +6,7 @@ import { DEFAULT_QUERY, GmailAuthError, searchMessages, withExcludes, type Gmail
 import { CopyButton } from "./CopyButton";
 import { GmailResults } from "./GmailResults";
 import { GmailFilters } from "./GmailFilters";
+import { gmailPeriodQuery, periods } from "@/lib/periods";
 
 export const metadata: Metadata = { title: "E-post – ReceiptMe" };
 
@@ -16,10 +17,14 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
   const urlError = one(params.feil);
   const hasQuery = "q" in params;
   const q = hasQuery ? one(params.q).trim() : DEFAULT_QUERY;
+  const periodOptions = periods();
+  const periode = periodOptions.some((p) => p.key === one(params.periode)) ? one(params.periode) : "alltid";
+  const periodQuery = gmailPeriodQuery(periodOptions.find((p) => p.key === periode));
   // Sidetokens fra Gmail, ett per side vi har bladd forbi, skilt med punktum
   const pages = one(params.side).split(".").filter((t) => /^[0-9A-Za-z_-]+$/.test(t)).slice(0, 50);
   const pageLink = (stack: string[]) => {
     const sp = new URLSearchParams({ q });
+    if (periode !== "alltid") sp.set("periode", periode);
     if (stack.length) sp.set("side", stack.join("."));
     return `/epost?${sp}`;
   };
@@ -45,7 +50,7 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
     try {
       const token = await gmailAccessToken(user.id);
       if (token) {
-        const page = await searchMessages(token, withExcludes(q, settings.gmail_excludes), pages.at(-1));
+        const page = await searchMessages(token, withExcludes(`${q} ${periodQuery}`.trim(), settings.gmail_excludes), pages.at(-1));
         hits = page.hits;
         nextPageToken = page.nextPageToken;
         estimate = page.estimate;
@@ -139,6 +144,11 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
           <>
             <form method="get" className="flex flex-col gap-2 sm:flex-row">
               <input name="q" defaultValue={q} className="input flex-1" aria-label="Søk i Gmail" />
+              <select name="periode" defaultValue={periode} className="input sm:w-44" aria-label="Periode">
+                {periodOptions.map((p) => (
+                  <option key={p.key} value={p.key}>{p.label}</option>
+                ))}
+              </select>
               <button className="btn-primary" type="submit">Søk</button>
             </form>
             <p className="text-xs text-muted">
@@ -155,7 +165,7 @@ export default async function EmailPage({ searchParams }: PageProps<"/epost">) {
             {!searchError && q && (
               <>
                 <GmailResults
-                  key={`${q}|${pages.join(".")}`}
+                  key={`${q}|${periode}|${pages.join(".")}`}
                   hits={hits}
                   imported={imported}
                   skipped={settings?.gmail_min_amount !== null ? (settings?.gmail_skipped ?? []) : []}

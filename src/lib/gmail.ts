@@ -8,7 +8,7 @@ export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 
 /** Standardsøk når brukeren ikke har skrevet noe selv. */
 export const DEFAULT_QUERY =
-  '(kvittering OR receipt OR ordrebekreftelse OR "order confirmation" OR "takk for kjøpet" OR "takk for din bestilling" OR faktura OR invoice) newer_than:1y';
+  '(kvittering OR receipt OR ordrebekreftelse OR "order confirmation" OR "takk for kjøpet" OR "takk for din bestilling" OR faktura OR invoice)';
 
 export class GmailAuthError extends Error {}
 
