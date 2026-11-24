@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Scanner } from "./Scanner";
 
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -34,8 +35,9 @@ export function Uploader({ userId }: { userId: string }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [scanFile, setScanFile] = useState<File | null>(null);
 
-  async function handleFile(file: File | undefined) {
+  function handleFile(file: File | undefined) {
     if (!file) return;
     setError(null);
 
@@ -44,6 +46,16 @@ export function Uploader({ userId }: { userId: string }) {
       setError("Filtypen støttes ikke. Bruk JPG, PNG, HEIC eller PDF.");
       return;
     }
+    // Bilder går via skanneren (auto-crop + PDF). PDF-er lastes opp direkte.
+    if (type !== "application/pdf") {
+      setScanFile(file);
+      return;
+    }
+    upload(file, type);
+  }
+
+  async function upload(file: Blob, type: string) {
+    setScanFile(null);
     if (file.size > MAX_BYTES) {
       setError("Filen er for stor (maks 20 MB).");
       return;
@@ -86,6 +98,17 @@ export function Uploader({ userId }: { userId: string }) {
   }
 
   const busy = step !== "idle";
+
+  if (scanFile) {
+    return (
+      <Scanner
+        file={scanFile}
+        onDone={(pdf) => upload(pdf, "application/pdf")}
+        onSkip={() => upload(scanFile, detectType(scanFile)!)}
+        onCancel={() => setScanFile(null)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-3">
