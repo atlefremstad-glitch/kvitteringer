@@ -7,7 +7,7 @@ import { isCategory } from "@/lib/categories";
 import { parseAmount, parseDate } from "@/lib/format";
 import { geocode } from "@/lib/geocode";
 import { nokFields } from "@/lib/fx";
-import { BUCKET, processReceipt, refreshLocation } from "@/lib/process";
+import { processReceipt, refreshLocation } from "@/lib/process";
 
 export type ReceiptInput = {
   merchant: string;
@@ -102,13 +102,18 @@ export async function findLocation(id: string) {
   return result;
 }
 
+/** Flytter kvitteringen til søppelbøtta. */
 export async function deleteReceipt(id: string) {
   const { supabase } = await requireUser();
-  const { data } = await supabase.from("receipts").select("file_path").eq("id", id).single();
-  if (data?.file_path) await supabase.storage.from(BUCKET).remove([data.file_path]);
-  const { error } = await supabase.from("receipts").delete().eq("id", id);
+  const { error } = await supabase
+    .from("receipts")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/");
+  revalidatePath("/kart");
+  revalidatePath("/soppelbotte");
+  revalidatePath("/prosjekter", "layout");
   redirect("/");
 }
 

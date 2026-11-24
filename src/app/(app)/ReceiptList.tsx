@@ -156,7 +156,7 @@ export function ReceiptList({ rows, projects }: { rows: ReceiptRow[]; projects: 
             ) : mode === "delete" ? (
               <div className="space-y-3">
                 <p className="text-sm font-medium">
-                  Slette {selected.size} {selected.size === 1 ? "kvittering" : "kvitteringer"} for godt? Bildene og filene slettes også. Dette kan ikke angres.
+                  Flytte {selected.size} {selected.size === 1 ? "kvittering" : "kvitteringer"} til søppelbøtta? Du kan hente {selected.size === 1 ? "den" : "dem"} tilbake i 30 dager.
                 </p>
                 {error && <p className="text-sm text-red-600">{error}</p>}
                 <div className="flex justify-end gap-2">

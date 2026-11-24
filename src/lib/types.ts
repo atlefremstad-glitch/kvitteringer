@@ -35,6 +35,7 @@ export type Receipt = {
   project_id: string | null;
   exchange_rate: number | null;
   nok_total: number | null;
+  deleted_at: string | null;
   raw_ai: unknown;
   ai_error: string | null;
 };

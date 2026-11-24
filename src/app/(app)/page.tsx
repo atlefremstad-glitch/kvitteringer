@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { CATEGORIES } from "@/lib/categories";
 import { periods } from "@/lib/periods";
 import { ReceiptList, type ReceiptRow } from "./ReceiptList";
+import { purgeExpired } from "@/lib/trash";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 const isIsoDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -35,6 +36,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
     .select("id, merchant, purchase_date, total, currency, category, status, created_at, note, project_id, items")
     .order("purchase_date", { ascending: false, nullsFirst: true })
     .order("created_at", { ascending: false })
+    .is("deleted_at", null)
     .limit(1000);
 
   if (q) query = query.ilike("merchant", `%${q.replace(/[%_\\]/g, "\\$&")}%`);
@@ -43,9 +45,13 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
   if (isIsoDate(til)) query = query.lte("purchase_date", til);
   if (over !== null) query = query.gt("total", over);
 
-  const [{ data, error }, { data: projectData }] = await Promise.all([
+  // Rydder bort det som har ligget i søppelbøtta i over 30 dager
+  await purgeExpired(supabase);
+
+  const [{ data, error }, { data: projectData }, { count: trashCount }] = await Promise.all([
     query,
     supabase.from("projects").select("id, name").order("created_at", { ascending: false }),
+    supabase.from("receipts").select("id", { count: "exact", head: true }).not("deleted_at", "is", null),
   ]);
   const rows = (data ?? []) as ReceiptRow[];
   const projects = (projectData ?? []) as { id: string; name: string }[];
@@ -104,6 +110,9 @@ export default async function ReceiptsPage({ searchParams }: PageProps<"/">) {
           {rows.length} {rows.length === 1 ? "kvittering" : "kvitteringer"}
           {filtered ? " (filtrert)" : ""}
         </p>
+        <Link href="/soppelbotte" className="text-sm text-muted underline">
+          Søppelbøtte{trashCount ? ` (${trashCount})` : ""}
+        </Link>
       </div>
 
       {error && <p className="text-sm text-red-600">Kunne ikke hente kvitteringer: {error.message}</p>}

@@ -76,7 +76,7 @@ export function EditForm({ receipt }: { receipt: Receipt }) {
   }
 
   function remove() {
-    if (!window.confirm("Slette kvitteringen? Dette kan ikke angres.")) return;
+    if (!window.confirm("Flytte kvitteringen til søppelbøtta? Du kan hente den tilbake i 30 dager.")) return;
     setAction("delete");
     startTransition(async () => {
       const res = await deleteReceipt(receipt.id);

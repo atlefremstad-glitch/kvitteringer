@@ -18,9 +18,10 @@ export default async function MapPage() {
       .select("id, merchant, purchase_date, total, currency, address, latitude, longitude")
       .not("latitude", "is", null)
       .not("longitude", "is", null)
+      .is("deleted_at", null)
       .order("purchase_date", { ascending: false, nullsFirst: false })
       .limit(2000),
-    supabase.from("receipts").select("id", { count: "exact", head: true }).is("latitude", null),
+    supabase.from("receipts").select("id", { count: "exact", head: true }).is("latitude", null).is("deleted_at", null),
   ]);
   const rows = (data ?? []) as Row[];
 

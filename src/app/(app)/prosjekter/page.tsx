@@ -18,6 +18,7 @@ export default async function ProjectsPage() {
   const { data, error } = await supabase
     .from("projects")
     .select("id, name, created_at, receipts(total, nok_total, purchase_date)")
+    .is("receipts.deleted_at", null)
     .order("created_at", { ascending: false });
   const projects = (data ?? []) as ProjectRow[];
 
