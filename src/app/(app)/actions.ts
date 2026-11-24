@@ -3,27 +3,63 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/server";
 import { BUCKET } from "@/lib/process";
+import { purgeReceipts } from "@/lib/trash";
 
-/** Sletter flere kvitteringer og filene deres. */
+const isId = (v: string) => /^[0-9a-f-]{36}$/i.test(v);
+
+function refreshLists() {
+  revalidatePath("/");
+  revalidatePath("/kart");
+  revalidatePath("/soppelbotte");
+  revalidatePath("/prosjekter", "layout");
+}
+
+/** Flytter kvitteringer til søppelbøtta. De slettes for godt etter 30 dager. */
 export async function deleteReceipts(receiptIds: string[]) {
-  const ids = receiptIds.filter((v) => /^[0-9a-f-]{36}$/i.test(v)).slice(0, 1000);
+  const ids = receiptIds.filter(isId).slice(0, 1000);
   if (ids.length === 0) return { ok: false as const, error: "Velg minst én kvittering." };
 
   const { supabase } = await requireUser();
-  const { data, error: readError } = await supabase.from("receipts").select("id, file_path").in("id", ids);
-  if (readError) return { ok: false as const, error: readError.message };
-
-  const { error } = await supabase.from("receipts").delete().in("id", ids);
+  const { data, error } = await supabase
+    .from("receipts")
+    .update({ deleted_at: new Date().toISOString() })
+    .in("id", ids)
+    .is("deleted_at", null)
+    .select("id");
   if (error) return { ok: false as const, error: error.message };
 
-  // Filene slettes etter radene, så en feil her aldri etterlater kvitteringer uten fil.
-  const paths = (data ?? []).map((r) => r.file_path as string).filter(Boolean);
-  if (paths.length > 0) await supabase.storage.from(BUCKET).remove(paths);
-
-  revalidatePath("/");
-  revalidatePath("/kart");
-  revalidatePath("/prosjekter", "layout");
+  refreshLists();
   return { ok: true as const, deleted: data?.length ?? 0 };
+}
+
+/** Henter kvitteringer tilbake fra søppelbøtta. */
+export async function restoreReceipts(receiptIds: string[]) {
+  const ids = receiptIds.filter(isId).slice(0, 1000);
+  if (ids.length === 0) return { ok: false as const, error: "Velg minst én kvittering." };
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase.from("receipts").update({ deleted_at: null }).in("id", ids);
+  if (error) return { ok: false as const, error: error.message };
+
+  refreshLists();
+  for (const id of ids) revalidatePath(`/kvittering/${id}`);
+  return { ok: true as const };
+}
+
+/** Sletter kvitteringer i søppelbøtta for godt, med filene. Kan ikke angres. */
+export async function purgeFromTrash(receiptIds: string[] | "all") {
+  const { supabase } = await requireUser();
+  let ids: string[];
+  if (receiptIds === "all") {
+    const { data, error } = await supabase.from("receipts").select("id").not("deleted_at", "is", null).limit(1000);
+    if (error) return { ok: false as const, error: error.message };
+    ids = (data ?? []).map((r) => r.id as string);
+  } else {
+    ids = receiptIds.filter(isId).slice(0, 1000);
+  }
+  const result = await purgeReceipts(supabase, ids);
+  refreshLists();
+  return result;
 }
 
 export type Preview =

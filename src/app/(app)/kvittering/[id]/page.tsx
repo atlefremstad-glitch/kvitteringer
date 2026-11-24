@@ -7,6 +7,7 @@ import type { Receipt } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EditForm } from "./EditForm";
 import { LocationCard } from "./LocationCard";
+import { TrashBanner } from "./TrashBanner";
 
 export const metadata: Metadata = { title: "Kvittering – ReceiptMe" };
 export const maxDuration = 60;
@@ -53,6 +54,8 @@ export default async function ReceiptPage({ params }: PageProps<"/kvittering/[id
           <StatusBadge status={receipt.status} />
         </div>
       </div>
+
+      {receipt.deleted_at && <TrashBanner id={receipt.id} />}
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="card overflow-hidden md:sticky md:top-20 md:self-start">

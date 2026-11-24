@@ -24,6 +24,7 @@ export default async function ProjectPage({ params }: PageProps<"/prosjekter/[id
       .from("receipts")
       .select("id, merchant, purchase_date, total, currency, category, status, note, nok_total, exchange_rate")
       .eq("project_id", id)
+      .is("deleted_at", null)
       .order("purchase_date", { ascending: false, nullsFirst: true })
       .order("created_at", { ascending: false }),
   ]);
